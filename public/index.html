@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CMMS PRO</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0e1a;--bg2:#0f1629;--bg3:#141e35;--bg4:#1a2540;
+  --bd:rgba(40,70,140,.4);--bd2:rgba(60,100,200,.5);
+  --tx:#c8d8f0;--tx2:#7a9cc8;--tx3:#4a6888;
+  --blue:#4d9fff;--blue2:#1a5fcc;
+  --green:#00c87a;--amber:#ffb800;--red:#ff3d5a;--purple:#9d6fff;
+  --cyan:#00e5ff;
+}
+html,body{height:100%;font-family:'Segoe UI',Tahoma,sans-serif;background:var(--bg);color:var(--tx);font-size:14px}
+#loginPage{display:flex;align-items:center;justify-content:center;min-height:100vh;background:radial-gradient(ellipse at 30% 50%,rgba(26,95,204,.15),transparent 60%),var(--bg)}
+.login-card{background:var(--bg2);border:1px solid var(--bd2);border-radius:16px;padding:40px 36px;width:360px;text-align:center}
+.login-logo{font-size:32px;font-weight:800;color:var(--blue);letter-spacing:2px;margin-bottom:4px}
+.login-sub{font-size:12px;color:var(--tx3);margin-bottom:28px}
+.login-tabs{display:flex;gap:8px;margin-bottom:20px;background:var(--bg3);border-radius:8px;padding:4px}
+.login-tab{flex:1;padding:8px;border-radius:6px;border:none;background:none;color:var(--tx2);cursor:pointer;font-size:13px;transition:all .2s}
+.login-tab.active{background:var(--blue2);color:white}
+.login-label{font-size:11px;color:var(--tx3);text-align:left;margin-bottom:5px;text-transform:uppercase;letter-spacing:.8px}
+.login-input{width:100%;background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;color:var(--tx);font-size:16px;letter-spacing:4px;text-align:center;outline:none;transition:border-color .2s;margin-bottom:16px}
+.login-input:focus{border-color:var(--blue)}
+.login-btn{width:100%;padding:12px;background:var(--blue2);border:none;border-radius:8px;color:white;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s}
+.login-btn:hover{background:#1d6be0}
+.login-err{color:var(--red);font-size:12px;margin-top:8px;min-height:16px}
+.login-public{margin-top:20px;padding-top:16px;border-top:1px solid var(--bd);font-size:12px;color:var(--tx3)}
+.login-public a{color:var(--blue);cursor:pointer;text-decoration:none}
+/* APP */
+#appPage{display:none;height:100vh;flex-direction:column}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--bd);padding:0 20px;height:50px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.app-logo{font-size:16px;font-weight:800;color:var(--blue);letter-spacing:1px;margin-right:auto}
+.clock{font-size:11px;color:var(--cyan);background:var(--bg3);border:1px solid var(--bd);padding:3px 9px;border-radius:4px;font-family:monospace}
+.user-chip{font-size:12px;color:var(--tx2);background:var(--bg3);border:1px solid var(--bd);padding:4px 10px;border-radius:6px}
+.logout-btn{background:none;border:1px solid rgba(255,61,90,.3);border-radius:6px;padding:5px 10px;color:var(--red);cursor:pointer;font-size:12px}
+.body-wrap{display:flex;flex:1;overflow:hidden}
+/* SIDEBAR */
+.sidebar{width:200px;background:var(--bg2);border-right:1px solid var(--bd);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+.nav-section{padding:10px 16px 4px;font-size:9px;color:var(--tx3);text-transform:uppercase;letter-spacing:1.5px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 16px;cursor:pointer;color:var(--tx3);transition:all .15s;border-left:2px solid transparent;font-size:13px}
+.nav-item:hover,.nav-item.active{background:rgba(77,159,255,.08);color:var(--tx);border-left-color:var(--blue)}
+.nav-item.active{color:var(--blue)}
+/* CONTENT */
+.content{flex:1;overflow-y:auto;padding:20px;background:var(--bg)}
+.page{display:none}.page.active{display:block}
+/* KPI CARDS */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+.kpi-card{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:16px}
+.kpi-val{font-size:28px;font-weight:700;color:var(--blue);margin-bottom:4px}
+.kpi-label{font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px}
+/* TABLE */
+.table-wrap{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;overflow:hidden}
+table{width:100%;border-collapse:collapse}
+th{padding:10px 14px;text-align:left;font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--bd);background:var(--bg3)}
+td{padding:10px 14px;font-size:13px;border-bottom:1px solid rgba(40,70,140,.2);color:var(--tx)}
+tr:hover td{background:rgba(77,159,255,.04)}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.badge-open{background:rgba(77,159,255,.15);color:var(--blue)}
+.badge-inprog{background:rgba(255,184,0,.15);color:var(--amber)}
+.badge-done{background:rgba(0,200,122,.15);color:var(--green)}
+.badge-overdue{background:rgba(255,61,90,.15);color:var(--red)}
+.badge-crit{background:rgba(255,61,90,.15);color:var(--red)}
+.badge-high{background:rgba(255,184,0,.15);color:var(--amber)}
+.badge-med{background:rgba(77,159,255,.15);color:var(--blue)}
+.badge-low{background:rgba(74,104,136,.15);color:var(--tx3)}
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center}
+.modal-overlay.active{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--bd2);border-radius:12px;padding:24px;width:90%;max-width:500px;max-height:85vh;overflow-y:auto}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:18px;color:var(--tx)}
+.form-group{margin-bottom:14px}
+.form-label{font-size:11px;color:var(--tx3);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.6px}
+.form-input,.form-select,.form-textarea{width:100%;background:var(--bg3);border:1px solid var(--bd);border-radius:7px;padding:9px 12px;color:var(--tx);font-size:13px;outline:none;transition:border-color .2s}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--blue)}
+.form-textarea{resize:vertical;min-height:80px}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+.btn{padding:9px 18px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s}
+.btn-primary{background:var(--blue2);color:white}.btn-primary:hover{background:#1d6be0}
+.btn-secondary{background:var(--bg3);color:var(--tx2);border:1px solid var(--bd)}.btn-secondary:hover{background:var(--bg4)}
+/* TOAST */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--bg2);border:1px solid var(--bd2);border-radius:8px;padding:12px 18px;font-size:13px;z-index:999;transform:translateY(100px);opacity:0;transition:all .3s;max-width:300px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{border-color:var(--green);color:var(--green)}
+.toast.error{border-color:var(--red);color:var(--red)}
+/* PAGE HEADER */
+.page-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.page-title{font-size:18px;font-weight:700;color:var(--tx)}
+</style>
+</head>
+<body>
+
+<!-- LOGIN PAGE -->
+<div id="loginPage">
+  <div class="login-card">
+    <div class="login-logo">CMMS PRO</div>
+    <div class="login-sub">Maintenance Management System v3.0</div>
+    <div class="login-tabs">
+      <button class="login-tab active" onclick="setRole('admin')">Admin</button>
+      <button class="login-tab" onclick="setRole('tech')">Technician</button>
+    </div>
+    <div class="login-label">PIN Code</div>
+    <input type="password" id="pinInput" class="login-input" placeholder="••••" maxlength="8" inputmode="numeric" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">Login</button>
+    <div class="login-err" id="loginErr"></div>
+    <div class="login-public">
+      <a onclick="showPublicForm()">Report an Issue (No Login Required)</a>
+    </div>
+  </div>
+</div>
+
+<!-- APP PAGE -->
+<div id="appPage">
+  <div class="topbar">
+    <div class="app-logo">CMMS PRO</div>
+    <div class="clock" id="clockEl">--:--:--</div>
+    <div class="user-chip" id="userChip">User</div>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+  </div>
+  <div class="body-wrap">
+    <div class="sidebar" id="sidebar"></div>
+    <div class="content" id="content">
+      <!-- Pages rendered here -->
+      <div class="page active" id="pageDashboard"></div>
+      <div class="page" id="pageWO"></div>
+      <div class="page" id="pageAssets"></div>
+      <div class="page" id="pageParts"></div>
+      <div class="page" id="pagePM"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PUBLIC FORM MODAL -->
+<div class="modal-overlay" id="publicModal">
+  <div class="modal">
+    <h3>Report Maintenance Issue</h3>
+    <div class="form-group">
+      <label class="form-label">Issue Title *</label>
+      <input type="text" id="pubTitle" class="form-input" placeholder="Describe the problem...">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Your Name</label>
+      <input type="text" id="pubName" class="form-input" placeholder="Your name (optional)">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Contact (Email/Phone)</label>
+      <input type="text" id="pubContact" class="form-input" placeholder="For follow-up">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea id="pubDesc" class="form-textarea" placeholder="Additional details..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('publicModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitPublicRequest()">Submit Request</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEW WO MODAL -->
+<div class="modal-overlay" id="newWOModal">
+  <div class="modal">
+    <h3>Create Work Order</h3>
+    <div class="form-group">
+      <label class="form-label">Title *</label>
+      <input type="text" id="woTitle" class="form-input">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Asset</label>
+      <select id="woAsset" class="form-select"><option value="">-- Select Asset --</option></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Type</label>
+      <select id="woType" class="form-select">
+        <option value="reactive">Reactive</option>
+        <option value="preventive">Preventive</option>
+        <option value="inspection">Inspection</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Priority</label>
+      <select id="woPriority" class="form-select">
+        <option value="low">Low</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+        <option value="critical">Critical</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Assigned To</label>
+      <input type="text" id="woAssigned" class="form-input" placeholder="Technician name">
+    </div>
+    <div class="form-group">
+      <label class="form-label">SLA (Hours)</label>
+      <input type="number" id="woSLA" class="form-input" value="4" min="1">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea id="woDesc" class="form-textarea"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('newWOModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitNewWO()">Create WO</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+let TOKEN = localStorage.getItem('cmms_token') || '';
+let ROLE = localStorage.getItem('cmms_role') || '';
+let USER_NAME = localStorage.getItem('cmms_name') || '';
+let currentRole = 'admin';
+let assets = [];
+
+// INIT
+if (TOKEN) { showApp(); loadDashboard(); } else { showLogin(); }
+
+function setRole(r) {
+  currentRole = r;
+  document.querySelectorAll('.login-tab').forEach((t,i) => t.classList.toggle('active', (r==='admin'&&i===0)||(r==='tech'&&i===1)));
+}
+
+async function doLogin() {
+  const pin = document.getElementById('pinInput').value;
+  if (!pin) return;
+  const r = await fetch(API+'/api/auth/login', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:currentRole,pin})});
+  const d = await r.json();
+  if (d.token) {
+    TOKEN = d.token; ROLE = d.role; USER_NAME = d.name;
+    localStorage.setItem('cmms_token',TOKEN);
+    localStorage.setItem('cmms_role',ROLE);
+    localStorage.setItem('cmms_name',USER_NAME);
+    showApp(); loadDashboard();
+  } else {
+    document.getElementById('loginErr').textContent = d.error || 'Login failed';
+  }
+}
+
+function logout() {
+  TOKEN=''; ROLE=''; USER_NAME='';
+  localStorage.removeItem('cmms_token');
+  localStorage.removeItem('cmms_role');
+  localStorage.removeItem('cmms_name');
+  showLogin();
+}
+
+function showLogin() { document.getElementById('loginPage').style.display='flex'; document.getElementById('appPage').style.display='none'; }
+function showApp() {
+  document.getElementById('loginPage').style.display='none';
+  document.getElementById('appPage').style.display='flex';
+  document.getElementById('userChip').textContent = USER_NAME + ' (' + ROLE + ')';
+  renderSidebar();
+  setInterval(() => {
+    document.getElementById('clockEl').textContent = new Date().toLocaleTimeString('th-TH',{timeZone:'Asia/Bangkok'});
+  }, 1000);
+}
+
+function renderSidebar() {
+  const items = [
+    {id:'Dashboard',icon:'📊',label:'Dashboard'},
+    {id:'WO',icon:'📋',label:'Work Orders'},
+    {id:'Assets',icon:'⚙️',label:'Assets'},
+    {id:'Parts',icon:'🔧',label:'Spare Parts'},
+    {id:'PM',icon:'📅',label:'PM Plans'},
+  ];
+  document.getElementById('sidebar').innerHTML = '<div style="padding:16px 16px 8px;font-weight:700;font-size:13px;color:var(--tx2)">CMMS PRO</div>' +
+    items.map(i=>`<div class="nav-item" id="nav${i.id}" onclick="navTo('${i.id}')">${i.icon} ${i.label}</div>`).join('');
+}
+
+function navTo(page) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page'+page).classList.add('active');
+  document.getElementById('nav'+page).classList.add('active');
+  if(page==='Dashboard') loadDashboard();
+  if(page==='WO') loadWO();
+  if(page==='Assets') loadAssets();
+  if(page==='Parts') loadParts();
+  if(page==='PM') loadPM();
+}
+
+async function api(path, opts={}) {
+  const r = await fetch(API+path, {headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'},...opts});
+  return r.json();
+}
+
+async function loadDashboard() {
+  const k = await api('/api/kpi/summary');
+  const s = k.summary || k;
+  document.getElementById('pageDashboard').innerHTML = `
+    <div class="page-hdr"><div class="page-title">Dashboard</div></div>
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-val">${s.total||0}</div><div class="kpi-label">Total WOs</div></div>
+      <div class="kpi-card"><div class="kpi-val" style="color:var(--blue)">${s.open||0}</div><div class="kpi-label">Open</div></div>
+      <div class="kpi-card"><div class="kpi-val" style="color:var(--amber)">${s.inprog||0}</div><div class="kpi-label">In Progress</div></div>
+      <div class="kpi-card"><div class="kpi-val" style="color:var(--green)">${s.completed||0}</div><div class="kpi-label">Completed</div></div>
+      <div class="kpi-card"><div class="kpi-val" style="color:var(--red)">${s.overdue||0}</div><div class="kpi-label">Overdue</div></div>
+      <div class="kpi-card"><div class="kpi-val" style="color:var(--cyan)">${s.assets||0}</div><div class="kpi-label">Active Assets</div></div>
+      <div class="kpi-card"><div class="kpi-val" style="color:var(--purple)">${s.avgMttr||0}h</div><div class="kpi-label">Avg MTTR</div></div>
+      <div class="kpi-card"><div class="kpi-val" style="color:var(--red)">${s.critical||0}</div><div class="kpi-label">Critical Open</div></div>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:16px">
+      <canvas id="kpiChart" height="120"></canvas>
+    </div>
+  `;
+  if (k.monthly && k.monthly.length > 0) {
+    new Chart(document.getElementById('kpiChart'), {
+      type:'bar',
+      data:{labels:k.monthly.map(m=>m.month),datasets:[{label:'Total',data:k.monthly.map(m=>m.total),backgroundColor:'rgba(77,159,255,.3)',borderColor:'#4d9fff',borderWidth:1},{label:'Completed',data:k.monthly.map(m=>m.completed),backgroundColor:'rgba(0,200,122,.3)',borderColor:'#00c87a',borderWidth:1}]},
+      options:{responsive:true,plugins:{legend:{labels:{color:'#7a9cc8'}}},scales:{x:{ticks:{color:'#4a6888'}},y:{ticks:{color:'#4a6888'}}}}
+    });
+  }
+}
+
+function statusBadge(s) {
+  const m={open:'badge-open',in_progress:'badge-inprog',completed:'badge-done',overdue:'badge-overdue'};
+  return `<span class="badge ${m[s]||'badge-open'}">${s}</span>`;
+}
+function priorityBadge(p) {
+  const m={critical:'badge-crit',high:'badge-high',medium:'badge-med',low:'badge-low'};
+  return `<span class="badge ${m[p]||'badge-med'}">${p}</span>`;
+}
+
+async function loadWO() {
+  const wos = await api('/api/work-orders');
+  document.getElementById('pageWO').innerHTML = `
+    <div class="page-hdr">
+      <div class="page-title">Work Orders</div>
+      <button class="btn btn-primary" onclick="openNewWO()">+ New WO</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>WO#</th><th>Title</th><th>Asset</th><th>Priority</th><th>Status</th><th>Assigned</th><th>SLA Deadline</th></tr></thead>
+        <tbody>
+          ${(Array.isArray(wos)?wos:[]).map(w=>`
+            <tr>
+              <td style="color:var(--blue);font-family:monospace">${w.wo_number}</td>
+              <td>${w.title}</td>
+              <td style="color:var(--tx2)">${w.asset_name||'-'}</td>
+              <td>${priorityBadge(w.priority)}</td>
+              <td>${statusBadge(w.status)}</td>
+              <td>${w.assigned_to||'-'}</td>
+              <td style="font-size:12px;color:var(--tx3)">${w.sla_deadline||'-'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function loadAssets() {
+  const list = await api('/api/assets');
+  document.getElementById('pageAssets').innerHTML = `
+    <div class="page-hdr"><div class="page-title">Assets</div></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Location</th><th>Status</th><th>Health</th></tr></thead>
+        <tbody>
+          ${(Array.isArray(list)?list:[]).map(a=>`
+            <tr>
+              <td style="color:var(--cyan);font-family:monospace">${a.code}</td>
+              <td>${a.name}</td>
+              <td style="color:var(--tx2)">${a.type}</td>
+              <td>${a.location||'-'}</td>
+              <td><span class="badge ${a.status==='active'?'badge-done':'badge-overdue'}">${a.status}</span></td>
+              <td style="color:${a.health_score>=80?'var(--green)':a.health_score>=50?'var(--amber)':'var(--red)'}">${a.health_score}%</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function loadParts() {
+  const d = await api('/api/spare-parts');
+  const parts = d.parts || [];
+  document.getElementById('pageParts').innerHTML = `
+    <div class="page-hdr">
+      <div class="page-title">Spare Parts</div>
+      <div style="font-size:12px;color:var(--tx3)">Low Stock: ${d.low_stock_count||0} items</div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Part No</th><th>Name</th><th>Category</th><th>Qty</th><th>Min Qty</th><th>Location</th></tr></thead>
+        <tbody>
+          ${parts.map(p=>`
+            <tr>
+              <td style="color:var(--cyan);font-family:monospace">${p.part_no||'-'}</td>
+              <td>${p.name}</td>
+              <td style="color:var(--tx2)">${p.category||'-'}</td>
+              <td style="color:${p.quantity<=p.min_qty?'var(--red)':'var(--green)';font-weight:700}">${p.quantity}</td>
+              <td style="color:var(--tx3)">${p.min_qty}</td>
+              <td>${p.location||'-'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function loadPM() {
+  const plans = await api('/api/pm-plans');
+  document.getElementById('pagePM').innerHTML = `
+    <div class="page-hdr"><div class="page-title">PM Plans</div></div>
+    ${(Array.isArray(plans)&&plans.length>0)?`
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Title</th><th>Asset</th><th>Frequency</th><th>Last Done</th><th>Next Due</th></tr></thead>
+        <tbody>
+          ${plans.map(p=>`<tr><td>${p.title}</td><td>${p.asset_name||'-'}</td><td>${p.frequency_days} days</td><td>${p.last_done||'-'}</td><td style="color:var(--amber)">${p.next_due||'-'}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    ` : '<div style="text-align:center;padding:40px;color:var(--tx3)">No PM plans yet</div>'}
+  `;
+}
+
+async function openNewWO() {
+  assets = await api('/api/assets');
+  const sel = document.getElementById('woAsset');
+  sel.innerHTML = '<option value="">-- Select Asset --</option>' + (Array.isArray(assets)?assets:[]).map(a=>`<option value="${a.id}">${a.code} - ${a.name}</option>`).join('');
+  document.getElementById('woTitle').value='';
+  document.getElementById('woDesc').value='';
+  document.getElementById('woAssigned').value='';
+  document.getElementById('woSLA').value='4';
+  openModal('newWOModal');
+}
+
+async function submitNewWO() {
+  const body = {
+    title: document.getElementById('woTitle').value,
+    asset_id: document.getElementById('woAsset').value||null,
+    type: document.getElementById('woType').value,
+    priority: document.getElementById('woPriority').value,
+    assigned_to: document.getElementById('woAssigned').value,
+    sla_hours: parseInt(document.getElementById('woSLA').value)||4,
+    description: document.getElementById('woDesc').value,
+  };
+  if (!body.title) return toast('Title required','error');
+  const r = await api('/api/work-orders',{method:'POST',body:JSON.stringify(body)});
+  if (r.wo_number) { toast('WO '+r.wo_number+' created','success'); closeModal('newWOModal'); loadWO(); navTo('WO'); }
+  else toast(r.error||'Error','error');
+}
+
+async function showPublicForm() { openModal('publicModal'); }
+async function submitPublicRequest() {
+  const body = {
+    title: document.getElementById('pubTitle').value,
+    requester_name: document.getElementById('pubName').value,
+    requester_contact: document.getElementById('pubContact').value,
+    description: document.getElementById('pubDesc').value,
+  };
+  if (!body.title) return toast('Please enter a title','error');
+  const r = await fetch(API+'/api/work-orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d = await r.json();
+  if (d.wo_number) { toast('Request submitted: '+d.wo_number,'success'); closeModal('publicModal'); }
+  else toast(d.error||'Error','error');
+}
+
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+function toast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// Initialize nav
+if (TOKEN) { navTo('Dashboard'); }
+</script>
+</body>
+</html>
