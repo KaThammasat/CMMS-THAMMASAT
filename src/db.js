@@ -125,11 +125,11 @@ function seedAssets() {
   if (!db.prepare("SELECT id FROM assets LIMIT 1").get()) {
     const ins = db.prepare("INSERT INTO assets(code,name,type,location,manufacturer,model,serial_no,install_date,warranty_exp,status,health_score) VALUES(?,?,?,?,?,?,?,?,?,?,?)");
     [
-      ["PUMP-01","Coolant Pump","Mechanical","Zone A","ITT","3x3","MTU-0842","2019-03-15","2024-03-15","active",92],
+      ["PUMP-01","Coolant Pump A","Mechanical","Zone A","ITT","3x3","MTU-0842","2019-03-15","2024-03-15","active",78],
       ["UPS-A3","UPS Unit A3","Power","Zone B","Eaton","9PX","APC-1147","2020-08-01","2025-08-01","active",42],
       ["CRAC-01","CRAC Unit 1","HVAC","Zone A","Stulz","CyberAir","LEN-0421","2021-01-10","2026-01-10","active",88],
       ["CRAC-02","CRAC Unit 2","HVAC","Zone C","Stulz","CyberAir","LEN-0563","2021-06-20","2026-06-20","active",74],
-      ["GEN-01","Generator G-01","Generator","Rooftop","CAT","C18","CAT-0291","2018-05-01","2023-05-01","active",88],
+      ["GEN-01","Generator G-01","Generator","Rooftop","CAT","C18","CAT-0291","2018-05-01","2023-05-01","active",65],
       ["PDU-B2","PDU Row B2","Electrical","Zone B","Raritan","PX3","RAR-2201","2022-03-01","2027-03-01","active",95],
     ].forEach(a => ins.run(...a));
     console.log("[DB] Seeded assets");
@@ -141,7 +141,7 @@ function seedParts() {
     const ins = db.prepare("INSERT INTO spare_parts(part_no,name,category,quantity,min_qty,unit_cost,location,supplier,notes) VALUES(?,?,?,?,?,?,?,?,?)");
     [
       ["BRG-6205","Bearing 6205-2RS","Bearing",12,5,350,"Shelf A-1","SKF",""],
-      ["BELT-B50","V-Belt B50","Belt",8,3,280,"Shelf A-2","Gates",""],
+      ["BELT-B50","V-Belt B50","Belt",3,3,280,"Shelf A-2","Gates",""],
       ["FILT-HEPA","HEPA Filter 24x24","Filter",6,4,1200,"Shelf B-1","Camfil",""],
       ["FUSE-32A","Fuse 32A","Electrical",20,10,85,"Shelf C-1","Legrand",""],
       ["OIL-SAE30","Engine Oil SAE30 1L","Oil",15,5,320,"Shelf D-1","Shell",""],
@@ -150,9 +150,44 @@ function seedParts() {
   }
 }
 
+function seedWO() {
+  if (!db.prepare("SELECT id FROM work_orders LIMIT 1").get()) {
+    const ins = db.prepare(`INSERT INTO work_orders(wo_number,title,description,asset_id,type,priority,status,assigned_to,sla_hours,sla_deadline,started_at,completed_at,root_cause,labor_hours,notes,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+    const now = new Date();
+    const ago = (h) => new Date(now - h*3600000).toISOString().slice(0,16).replace('T',' ');
+    const future = (h) => new Date(now.getTime() + h*3600000).toISOString().slice(0,16).replace('T',' ');
+    [
+      ["WO-2026-001","PUMP-01 - Coolant Pump Vibration High","Abnormal vibration detected at 4.8mm/s. Check bearing and alignment.",1,"reactive","critical","overdue","Somchai J.",4,ago(8),ago(8),null,null,null,"Urgent - may cause pump failure",ago(10)],
+      ["WO-2026-002","CRAC-02 - Filter Replacement PM","Quarterly HEPA filter replacement per PM schedule.",4,"preventive","high","in_progress","Nong S.",8,future(4),ago(2),null,null,null,"",ago(5)],
+      ["WO-2026-003","GEN-01 - Annual Load Test","Annual generator load test and oil change.",5,"preventive","high","open","Tan W.",8,future(48),null,null,null,null,"Schedule during low-demand period",ago(2)],
+      ["WO-2026-004","Fire Suppression - Quarterly Test","Quarterly fire suppression system functional test.",null,"preventive","medium","completed","Praew K.",4,ago(20),ago(25),ago(1),"System passed all tests. Replaced 2 defective nozzles.",2.0,"All checks passed",ago(30)],
+      ["WO-2026-005","UPS-A3 - Battery Capacity Test","UPS battery capacity degraded to 68%. Test and replace if needed.",2,"inspection","critical","open","Somchai J.",2,future(2),null,null,null,null,"Battery health critical",ago(1)],
+      ["WO-2026-006","PDU-B2 - Outlet Inspection","Routine inspection of PDU outlets and connections.",6,"inspection","low","open","",8,future(72),null,null,null,null,"",ago(1)],
+    ].forEach(w => ins.run(...w));
+    console.log("[DB] Seeded work orders");
+  }
+}
+
+function seedPM() {
+  if (!db.prepare("SELECT id FROM pm_plans LIMIT 1").get()) {
+    const ins = db.prepare("INSERT INTO pm_plans(asset_id,title,description,frequency_days,last_done,next_due,assigned_to,checklist) VALUES(?,?,?,?,?,?,?,?)");
+    [
+      [1,"PUMP-01 Monthly PM","Check bearings, lubrication, alignment, vibration",30,"2026-03-15","2026-04-15","Somchai J.","[]"],
+      [2,"UPS-A3 Battery Test","Monthly battery capacity and runtime test",30,"2026-03-01","2026-04-01","Somchai J.","[]"],
+      [3,"CRAC-01 Filter Change","Replace HEPA filter and clean coils",90,"2026-01-10","2026-04-10","Nong S.","[]"],
+      [4,"CRAC-02 Filter Change","Replace HEPA filter and clean coils",90,"2026-01-20","2026-04-20","Nong S.","[]"],
+      [5,"GEN-01 Annual Service","Oil change, filter, load test, battery",365,"2025-04-15","2026-04-15","Tan W.","[]"],
+      [6,"PDU-B2 Inspection","Check all outlets, connections, load balancing",180,"2025-10-01","2026-04-01","","[]"],
+    ].forEach(p => ins.run(...p));
+    console.log("[DB] Seeded PM plans");
+  }
+}
+
 seedUsers();
 seedAssets();
 seedParts();
+seedWO();
+seedPM();
 
 const q = {
   userByRole:   (role)      => db.prepare("SELECT * FROM users WHERE role=?").get(role),
