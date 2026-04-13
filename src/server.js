@@ -229,7 +229,7 @@ app.post("/api/notifications/:id/read", auth(), (req, res) => {
 
 // HEALTH
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", app: "CMMS PRO", version: "3.0.0", time: new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }), timezone: "Asia/Bangkok" });
+  res.json({ status: "ok", app: "CMMS PRO", version: "3.0.1", time: new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }), timezone: "Asia/Bangkok" });
 });
 
 // SPA FALLBACK
