@@ -4,7 +4,28 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CMMS PRO v4</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js">function callAI(prompt,elId){
+  var el=document.getElementById(elId);if(!el)return;
+  el.innerHTML='<div style="color:#4a6080;font-size:13px;display:flex;align-items:center;gap:8px"><span style="color:#9d6fff">&#9679;&#9679;&#9679;</span> Analyzing with Claude AI...</div>';
+  api("/api/ai/analyze",{method:"POST",body:JSON.stringify({prompt:prompt})}).then(function(d){
+    if(d.text){
+      var t=d.text
+        .replace(/\*\*(.*?)\*\*/g,'<strong style="color:#c8d8f0">$1</strong>')
+        .replace(/^###\s*(.*)/gm,'<div style="font-size:13px;font-weight:700;color:#9d6fff;margin:12px 0 4px;border-bottom:1px solid rgba(157,111,255,.2);padding-bottom:4px">$1</div>')
+        .replace(/^##\s*(.*)/gm,'<div style="font-size:14px;font-weight:700;color:#3d8fff;margin:14px 0 6px">$1</div>')
+        .replace(/^#\s*(.*)/gm,'<div style="font-size:15px;font-weight:700;color:#3d8fff;margin:16px 0 8px">$1</div>')
+        .replace(/^(\d+\.\s)/gm,'<span style="color:#9d6fff;font-weight:700">$1</span>')
+        .replace(/^-\s/gm,'<span style="color:#3d8fff">&#8226; </span>')
+        .replace(/\n/g,'<br>');
+      el.innerHTML=t;
+    }else{
+      el.innerHTML='<div style="color:var(--red);padding:8px;background:rgba(255,64,96,.1);border-radius:6px">&#9888; '+(d.error||'Unknown error')+'</div>';
+    }
+  }).catch(function(e){
+    el.innerHTML='<div style="color:var(--red);padding:8px;background:rgba(255,64,96,.1);border-radius:6px">&#9888; Error: '+e.message+'</div>';
+  });
+}
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -235,26 +256,26 @@ tr:hover td{background:rgba(61,143,255,.04)}
 <!-- LOGIN -->
 <div id="loginPage">
   <div class="lcard">
-    <div class="logo-icon">⚙️</div>
+    <div class="logo-icon">âï¸</div>
     <div class="logo-text">CMMS PRO</div>
     <div class="logo-ver">VERSION 4.0</div>
     <div class="logo-sub">AI-Powered Maintenance Management System</div>
     <div class="rtabs">
-      <button class="rtab active" id="tabAdmin" onclick="setRole('admin')">👑 Admin</button>
-      <button class="rtab" id="tabTech" onclick="setRole('tech')">🔧 Technician</button>
+      <button class="rtab active" id="tabAdmin" onclick="setRole('admin')">ð Admin</button>
+      <button class="rtab" id="tabTech" onclick="setRole('tech')">ð§ Technician</button>
     </div>
     <label class="flbl">PIN CODE</label>
-    <input type="password" id="pinIn" class="finput" placeholder="••••" maxlength="8" inputmode="numeric" onkeydown="if(event.key==='Enter')doLogin()">
-    <button class="fbtn" onclick="doLogin()">🔐 Login</button>
+    <input type="password" id="pinIn" class="finput" placeholder="â¢â¢â¢â¢" maxlength="8" inputmode="numeric" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="fbtn" onclick="doLogin()">ð Login</button>
     <div class="lerr" id="lerr"></div>
-    <div class="lpub"><a onclick="openModal('pubModal')">📋 Report Issue (No Login Required)</a></div>
+    <div class="lpub"><a onclick="openModal('pubModal')">ð Report Issue (No Login Required)</a></div>
   </div>
 </div>
 
 <!-- APP -->
 <div id="appPage">
   <div class="topbar">
-    <div class="alogo">⚙️ CMMS PRO <span>AI-Powered Maintenance v4.0</span></div>
+    <div class="alogo">âï¸ CMMS PRO <span>AI-Powered Maintenance v4.0</span></div>
     <div class="clk" id="clk">--:--:--</div>
     <div class="uchip" id="uchip"><span>User</span> <span class="urole-badge" id="roleLabel">-</span></div>
     <button class="lout" onclick="logout()">Logout</button>
@@ -277,7 +298,7 @@ tr:hover td{background:rgba(61,143,255,.04)}
 <!-- PUBLIC MODAL -->
 <div class="moverlay" id="pubModal">
   <div class="modal">
-    <h3>📋 Report Maintenance Issue</h3>
+    <h3>ð Report Maintenance Issue</h3>
     <div class="fg"><label class="fl">Issue Title *</label><input type="text" id="pt" class="fi" placeholder="Describe the problem briefly"></div>
     <div class="frow">
       <div class="fg"><label class="fl">Your Name</label><input type="text" id="pn" class="fi"></div>
@@ -286,7 +307,7 @@ tr:hover td{background:rgba(61,143,255,.04)}
     <div class="fg"><label class="fl">Details</label><textarea id="pd" class="fta" placeholder="Additional details about the issue..."></textarea></div>
     <div class="mfoot">
       <button class="btn btn-secondary" onclick="closeModal('pubModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="submitPub()">📤 Submit Request</button>
+      <button class="btn btn-primary" onclick="submitPub()">ð¤ Submit Request</button>
     </div>
   </div>
 </div>
@@ -294,7 +315,7 @@ tr:hover td{background:rgba(61,143,255,.04)}
 <!-- NEW WO MODAL -->
 <div class="moverlay" id="woModal">
   <div class="modal">
-    <h3 id="woModalTitle">📋 Create Work Order</h3>
+    <h3 id="woModalTitle">ð Create Work Order</h3>
     <div class="fg"><label class="fl">Title *</label><input type="text" id="wt" class="fi" placeholder="Work order title"></div>
     <div class="frow">
       <div class="fg"><label class="fl">Asset</label><select id="wa" class="fsel"></select></div>
@@ -307,10 +328,10 @@ tr:hover td{background:rgba(61,143,255,.04)}
     </div>
     <div class="frow">
       <div class="fg"><label class="fl">Priority</label><select id="wp" class="fsel">
-        <option value="low">🟢 Low</option>
-        <option value="medium" selected>🔵 Medium</option>
-        <option value="high">🟡 High</option>
-        <option value="critical">🔴 Critical</option>
+        <option value="low">ð¢ Low</option>
+        <option value="medium" selected>ðµ Medium</option>
+        <option value="high">ð¡ High</option>
+        <option value="critical">ð´ Critical</option>
       </select></div>
       <div class="fg"><label class="fl">SLA Hours</label><input type="number" id="wsla" class="fi" value="4" min="1" max="720"></div>
     </div>
@@ -318,7 +339,7 @@ tr:hover td{background:rgba(61,143,255,.04)}
     <div class="fg"><label class="fl">Description</label><textarea id="wd" class="fta" placeholder="Detailed description of work to be done..."></textarea></div>
     <div class="mfoot">
       <button class="btn btn-secondary" onclick="closeModal('woModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="submitWO()">✅ Create Work Order</button>
+      <button class="btn btn-primary" onclick="submitWO()">â Create Work Order</button>
     </div>
   </div>
 </div>
@@ -338,13 +359,13 @@ tr:hover td{background:rgba(61,143,255,.04)}
 <!-- STATUS UPDATE MODAL -->
 <div class="moverlay" id="statusModal">
   <div class="modal">
-    <h3>🔄 Update Work Order Status</h3>
+    <h3>ð Update Work Order Status</h3>
     <input type="hidden" id="statusWoId">
     <div class="fg"><label class="fl">New Status</label><select id="newStatus" class="fsel">
-      <option value="open">📬 Open</option>
-      <option value="in_progress">🔧 In Progress</option>
-      <option value="completed">✅ Completed</option>
-      <option value="cancelled">❌ Cancelled</option>
+      <option value="open">ð¬ Open</option>
+      <option value="in_progress">ð§ In Progress</option>
+      <option value="completed">â Completed</option>
+      <option value="cancelled">â Cancelled</option>
     </select></div>
     <div class="fg"><label class="fl">Root Cause</label><input type="text" id="rootCause" class="fi" placeholder="Root cause of problem"></div>
     <div class="frow">
@@ -354,7 +375,7 @@ tr:hover td{background:rgba(61,143,255,.04)}
     <div class="fg"><label class="fl">Notes</label><textarea id="statusNotes" class="fta" rows="3"></textarea></div>
     <div class="mfoot">
       <button class="btn btn-secondary" onclick="closeModal('statusModal')">Cancel</button>
-      <button class="btn btn-success" onclick="submitStatus()">✅ Update</button>
+      <button class="btn btn-success" onclick="submitStatus()">â Update</button>
     </div>
   </div>
 </div>
@@ -362,7 +383,7 @@ tr:hover td{background:rgba(61,143,255,.04)}
 <!-- ASSET MODAL -->
 <div class="moverlay" id="assetModal">
   <div class="modal">
-    <h3>⚙️ Add Asset</h3>
+    <h3>âï¸ Add Asset</h3>
     <div class="frow">
       <div class="fg"><label class="fl">Code *</label><input type="text" id="aCode" class="fi" placeholder="e.g. PUMP-01"></div>
       <div class="fg"><label class="fl">Name *</label><input type="text" id="aName" class="fi"></div>
@@ -386,7 +407,7 @@ tr:hover td{background:rgba(61,143,255,.04)}
     <div class="fg"><label class="fl">Notes</label><textarea id="aNotes" class="fta" rows="2"></textarea></div>
     <div class="mfoot">
       <button class="btn btn-secondary" onclick="closeModal('assetModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="submitAsset()">✅ Add Asset</button>
+      <button class="btn btn-primary" onclick="submitAsset()">â Add Asset</button>
     </div>
   </div>
 </div>
@@ -394,7 +415,7 @@ tr:hover td{background:rgba(61,143,255,.04)}
 <!-- AI ANALYSIS MODAL -->
 <div class="moverlay" id="aiModal">
   <div class="modal modal-lg">
-    <h3>🤖 AI Analysis</h3>
+    <h3>ð¤ AI Analysis</h3>
     <div id="aiModalBody">
       <div class="ai-loading"><div class="ai-dots"><span></span><span></span><span></span></div> Analyzing...</div>
     </div>
@@ -439,7 +460,7 @@ function doLogin(){
       localStorage.setItem('ct',T);localStorage.setItem('cr',R);localStorage.setItem('cn',UN);
       document.getElementById('pinIn').value='';
       showApp();navTo('Dash');
-    }else showErr(d.error||'Login failed — check your PIN');
+    }else showErr(d.error||'Login failed â check your PIN');
   }).catch(function(){showErr('Connection error');});
 }
 function showErr(m){var e=document.getElementById('lerr');e.textContent=m;e.classList.add('show');}
@@ -464,12 +485,12 @@ function showApp(){
 // ========== SIDEBAR ==========
 function renderSB(){
   var items=[
-    {id:'Dash',icon:'📊',label:'Dashboard'},
-    {id:'WO',icon:'📋',label:'Work Orders'},
-    {id:'Assets',icon:'⚙️',label:'Assets'},
-    {id:'Parts',icon:'🔩',label:'Spare Parts'},
-    {id:'PM',icon:'📅',label:'PM Plans'},
-    {id:'AI',icon:'🤖',label:'AI Analysis'},
+    {id:'Dash',icon:'ð',label:'Dashboard'},
+    {id:'WO',icon:'ð',label:'Work Orders'},
+    {id:'Assets',icon:'âï¸',label:'Assets'},
+    {id:'Parts',icon:'ð©',label:'Spare Parts'},
+    {id:'PM',icon:'ð',label:'PM Plans'},
+    {id:'AI',icon:'ð¤',label:'AI Analysis'},
   ];
   var h='<div class="nsec">Main Menu</div>';
   items.forEach(function(i){
@@ -508,7 +529,7 @@ function sbadge(s){
 }
 function pbadge(p){
   var m={critical:'bp-crit',high:'bp-high',medium:'bp-med',low:'bp-low'};
-  var icons={critical:'🔴',high:'🟡',medium:'🔵',low:'🟢'};
+  var icons={critical:'ð´',high:'ð¡',medium:'ðµ',low:'ð¢'};
   return '<span class="badge '+(m[p]||'bp-med')+'">'+(icons[p]||'')+(p||'-')+'</span>';
 }
 function hcolor(v){if(v>=80)return 'qty-ok';if(v>=50)return 'famber';return 'qty-low';}
@@ -524,31 +545,31 @@ function loadDash(){
     var monthly=k.monthly||[];
     var byPri=k.byPriority||[];
     var byType=k.byType||[];
-    var h='<div class="phdr"><div class="ptitle">📊 Dashboard <small>Real-time Overview</small></div>';
-    h+='<div class="pactions"><button class="btn btn-ai" onclick="quickAIDash()">🤖 AI Insight</button>';
-    h+='<button class="btn btn-secondary btn-sm" onclick="loadDash()">🔄 Refresh</button></div></div>';
+    var h='<div class="phdr"><div class="ptitle">ð Dashboard <small>Real-time Overview</small></div>';
+    h+='<div class="pactions"><button class="btn btn-ai" onclick="quickAIDash()">ð¤ AI Insight</button>';
+    h+='<button class="btn btn-secondary btn-sm" onclick="loadDash()">ð Refresh</button></div></div>';
     
     // KPI Cards
     h+='<div class="kgrid">';
-    h+=kcard('Total WOs',(s.total||0),'var(--blue)','📋');
-    h+=kcard('Open',(s.open||0),'var(--blue)','📬');
-    h+=kcard('In Progress',(s.inprog||0),'var(--amber)','🔧');
-    h+=kcard('Completed',(s.completed||0),'var(--green)','✅');
-    h+=kcard('Overdue',(s.overdue||0),'var(--red)','⚠️');
-    h+=kcard('Active Assets',(s.assets||0),'var(--cyan)','⚙️');
-    h+=kcard('Avg MTTR',(s.avgMttr||0)+'h','var(--purple)','⏱️');
-    h+=kcard('Critical Open',(s.critical||0),'var(--red)','🚨');
+    h+=kcard('Total WOs',(s.total||0),'var(--blue)','ð');
+    h+=kcard('Open',(s.open||0),'var(--blue)','ð¬');
+    h+=kcard('In Progress',(s.inprog||0),'var(--amber)','ð§');
+    h+=kcard('Completed',(s.completed||0),'var(--green)','â');
+    h+=kcard('Overdue',(s.overdue||0),'var(--red)','â ï¸');
+    h+=kcard('Active Assets',(s.assets||0),'var(--cyan)','âï¸');
+    h+=kcard('Avg MTTR',(s.avgMttr||0)+'h','var(--purple)','â±ï¸');
+    h+=kcard('Critical Open',(s.critical||0),'var(--red)','ð¨');
     h+='</div>';
     
     // Charts
     h+='<div class="chart-grid">';
-    h+='<div class="chart-box"><div class="chart-title">📈 Monthly Trend</div><canvas id="chartMonthly" height="180"></canvas></div>';
-    h+='<div class="chart-box"><div class="chart-title">📊 By Priority</div><canvas id="chartPri" height="180"></canvas></div>';
+    h+='<div class="chart-box"><div class="chart-title">ð Monthly Trend</div><canvas id="chartMonthly" height="180"></canvas></div>';
+    h+='<div class="chart-box"><div class="chart-title">ð By Priority</div><canvas id="chartPri" height="180"></canvas></div>';
     h+='</div>';
     
     // AI Quick panel
     h+='<div class="ai-panel" id="dashAiPanel" style="display:none">';
-    h+='<div class="ai-header"><span class="ai-icon">🤖</span><span class="ai-title">AI Dashboard Insight</span></div>';
+    h+='<div class="ai-header"><span class="ai-icon">ð¤</span><span class="ai-title">AI Dashboard Insight</span></div>';
     h+='<div class="ai-content" id="dashAiContent"><div class="ai-loading"><div class="ai-dots"><span></span><span></span><span></span></div> Generating insight...</div></div>';
     h+='</div>';
     
@@ -604,20 +625,20 @@ function quickAIDash(){
 function loadWO(){
   api('/api/work-orders').then(function(wos){
     _wos=Array.isArray(wos)?wos:[];
-    var h='<div class="phdr"><div class="ptitle">📋 Work Orders <small>'+_wos.length+' total</small></div>';
+    var h='<div class="phdr"><div class="ptitle">ð Work Orders <small>'+_wos.length+' total</small></div>';
     h+='<div class="pactions">';
-    if(R==='admin'||R==='tech')h+='<button class="btn btn-primary" onclick="openNewWO()">➕ New WO</button>';
-    h+='<button class="btn btn-ai" onclick="aiAnalyzeWOs()">🤖 AI Analysis</button>';
-    h+='<button class="btn btn-secondary btn-sm" onclick="loadWO()">🔄</button>';
+    if(R==='admin'||R==='tech')h+='<button class="btn btn-primary" onclick="openNewWO()">â New WO</button>';
+    h+='<button class="btn btn-ai" onclick="aiAnalyzeWOs()">ð¤ AI Analysis</button>';
+    h+='<button class="btn btn-secondary btn-sm" onclick="loadWO()">ð</button>';
     h+='</div></div>';
     
     if(_wos.length===0){
-      h+='<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">No work orders yet<br><small>Create your first work order to get started</small></div></div>';
+      h+='<div class="empty"><div class="empty-icon">ð</div><div class="empty-text">No work orders yet<br><small>Create your first work order to get started</small></div></div>';
       document.getElementById('pWO').innerHTML=h;return;
     }
     
     h+='<div class="twrap"><div class="tbar">';
-    h+='<input type="text" class="tsearch" id="woSearch" placeholder="🔍 Search work orders..." oninput="filterWOs()">';
+    h+='<input type="text" class="tsearch" id="woSearch" placeholder="ð Search work orders..." oninput="filterWOs()">';
     h+='<select class="fi" style="width:auto;padding:7px 12px" id="woFilter" onchange="filterWOs()">';
     h+='<option value="">All Status</option><option value="open">Open</option><option value="in_progress">In Progress</option><option value="completed">Completed</option><option value="overdue">Overdue</option></select>';
     h+='</div>';
@@ -643,12 +664,12 @@ function renderWORows(wos){
     h+='<td>'+pbadge(w.priority)+'</td>';
     h+='<td>'+sbadge(w.status)+'</td>';
     h+='<td>'+(w.assigned_to||'<span style="color:var(--tx3)">Unassigned</span>')+'</td>';
-    h+='<td class="'+overSLA+'">'+sla+(overSLA?' ⚠️':'')+'</td>';
+    h+='<td class="'+overSLA+'">'+sla+(overSLA?' â ï¸':'')+'</td>';
     h+='<td><div onclick="event.stopPropagation()" style="display:flex;gap:4px">';
     if(R==='admin'||R==='tech'){
       h+='<button class="btn btn-sm" style="background:rgba(61,143,255,.15);color:var(--blue);border:1px solid rgba(61,143,255,.3);padding:4px 8px;font-size:11px" onclick="openStatusModal('+w.id+')">Update</button>';
     }
-    h+='<button class="btn btn-sm btn-ai" style="padding:4px 8px;font-size:11px" onclick="aiWO('+w.id+')">🤖</button>';
+    h+='<button class="btn btn-sm btn-ai" style="padding:4px 8px;font-size:11px" onclick="aiWO('+w.id+')">ð¤</button>';
     h+='</div></td></tr>';
   });
   return h;
@@ -684,11 +705,11 @@ function showWODetail(id){
   if(w.labor_hours)h+='<div class="fg"><div class="fl">Labor Hours</div><div style="font-size:24px;font-weight:700;color:var(--amber)">'+w.labor_hours+'h</div></div>';
   
   // AI Analysis for this WO
-  h+='<div class="ai-panel"><div class="ai-header"><span class="ai-icon">🤖</span><span class="ai-title">AI Analysis for this WO</span>';
+  h+='<div class="ai-panel"><div class="ai-header"><span class="ai-icon">ð¤</span><span class="ai-title">AI Analysis for this WO</span>';
   h+='<button class="btn btn-ai btn-sm" onclick="aiWO('+id+')" style="margin-left:auto">Analyze</button></div>';
   h+='<div class="ai-content" id="woAiDetail">Click "Analyze" for AI insights on this work order.</div></div>';
   
-  document.getElementById('woDetailTitle').textContent='📋 '+w.wo_number+': '+w.title;
+  document.getElementById('woDetailTitle').textContent='ð '+w.wo_number+': '+w.title;
   document.getElementById('woDetailBody').innerHTML=h;
   openModal('woDetailModal');
 }
@@ -703,7 +724,7 @@ function openNewWO(){
     document.getElementById('wd').value='';
     document.getElementById('wass').value='';
     document.getElementById('wsla').value='4';
-    document.getElementById('woModalTitle').textContent='📋 Create Work Order';
+    document.getElementById('woModalTitle').textContent='ð Create Work Order';
     openModal('woModal');
   });
 }
@@ -720,7 +741,7 @@ function submitWO(){
   if(!b.title){toast('Title is required','err');return;}
   api('/api/work-orders',{method:'POST',body:JSON.stringify(b)}).then(function(r){
     if(r.wo_number){
-      toast('✅ Work Order '+r.wo_number+' created!','ok');
+      toast('â Work Order '+r.wo_number+' created!','ok');
       closeModal('woModal');
       loadWO();navTo('WO');
     }else toast(r.error||'Error creating WO','err');
@@ -750,7 +771,7 @@ function submitStatus(){
   };
   api('/api/work-orders/'+id+'/status',{method:'PATCH',body:JSON.stringify(b)}).then(function(r){
     if(r.success){
-      toast('✅ Status updated to: '+b.status,'ok');
+      toast('â Status updated to: '+b.status,'ok');
       closeModal('statusModal');
       loadWO();
     }else toast(r.error||'Update failed','err');
@@ -762,18 +783,18 @@ function updateWOStatus(){openStatusModal(_curWoId);}
 function loadAssets(){
   api('/api/assets').then(function(list){
     _assets=Array.isArray(list)?list:[];
-    var h='<div class="phdr"><div class="ptitle">⚙️ Assets <small>'+_assets.length+' registered</small></div>';
+    var h='<div class="phdr"><div class="ptitle">âï¸ Assets <small>'+_assets.length+' registered</small></div>';
     h+='<div class="pactions">';
-    if(R==='admin')h+='<button class="btn btn-primary" onclick="openModal(\'assetModal\')">➕ Add Asset</button>';
-    h+='<button class="btn btn-ai" onclick="aiAnalyzeAssets()">🤖 AI Health Check</button>';
+    if(R==='admin')h+='<button class="btn btn-primary" onclick="openModal(\'assetModal\')">â Add Asset</button>';
+    h+='<button class="btn btn-ai" onclick="aiAnalyzeAssets()">ð¤ AI Health Check</button>';
     h+='</div></div>';
     
     if(_assets.length===0){
-      h+='<div class="empty"><div class="empty-icon">⚙️</div><div class="empty-text">No assets registered</div></div>';
+      h+='<div class="empty"><div class="empty-icon">âï¸</div><div class="empty-text">No assets registered</div></div>';
       document.getElementById('pAssets').innerHTML=h;return;
     }
     
-    h+='<div class="twrap"><div class="tbar"><input type="text" class="tsearch" placeholder="🔍 Search assets..." oninput="filterAssets(this.value)"></div>';
+    h+='<div class="twrap"><div class="tbar"><input type="text" class="tsearch" placeholder="ð Search assets..." oninput="filterAssets(this.value)"></div>';
     h+='<table><thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Location</th><th>Status</th><th>Health Score</th><th>WOs</th></tr></thead>';
     h+='<tbody id="assetTbody">'+renderAssetRows(_assets)+'</tbody></table>';
     h+='<div class="tfoot"><span>'+_assets.length+' assets</span></div></div>';
@@ -791,7 +812,7 @@ function renderAssetRows(assets){
     h+='<td>'+(a.location||'-')+'</td>';
     h+='<td><span class="badge '+(a.status==='active'?'bs-act':'bs-inact')+'">'+a.status+'</span></td>';
     h+='<td>'+hbar(a.health_score||100)+'</td>';
-    h+='<td><button class="btn btn-sm btn-ai" onclick="aiAsset('+a.id+',\''+a.code+'\',\''+a.name+'\')">🤖 Analyze</button></td>';
+    h+='<td><button class="btn btn-sm btn-ai" onclick="aiAsset('+a.id+',\''+a.code+'\',\''+a.name+'\')">ð¤ Analyze</button></td>';
     h+='</tr>';
   });
   return h;
@@ -817,7 +838,7 @@ function submitAsset(){
   if(!b.code||!b.name){toast('Code and Name are required','err');return;}
   api('/api/assets',{method:'POST',body:JSON.stringify(b)}).then(function(r){
     if(r.id){
-      toast('✅ Asset '+b.code+' added!','ok');
+      toast('â Asset '+b.code+' added!','ok');
       closeModal('assetModal');loadAssets();
     }else toast(r.error||'Error adding asset','err');
   });
@@ -828,28 +849,28 @@ function loadParts(){
   api('/api/spare-parts').then(function(d){
     _parts=(d.parts||[]);
     var lowCount=d.low_stock_count||0;
-    var h='<div class="phdr"><div class="ptitle">🔩 Spare Parts <small>'+_parts.length+' items</small></div>';
+    var h='<div class="phdr"><div class="ptitle">ð© Spare Parts <small>'+_parts.length+' items</small></div>';
     h+='<div class="pactions">';
-    if(lowCount>0)h+='<span class="badge bp-crit">⚠️ '+lowCount+' Low Stock</span>';
-    h+='<button class="btn btn-ai" onclick="aiAnalyzeParts()">🤖 Stock Analysis</button>';
+    if(lowCount>0)h+='<span class="badge bp-crit">â ï¸ '+lowCount+' Low Stock</span>';
+    h+='<button class="btn btn-ai" onclick="aiAnalyzeParts()">ð¤ Stock Analysis</button>';
     h+='</div></div>';
     
     if(_parts.length===0){
-      h+='<div class="empty"><div class="empty-icon">🔩</div><div class="empty-text">No spare parts registered</div></div>';
+      h+='<div class="empty"><div class="empty-icon">ð©</div><div class="empty-text">No spare parts registered</div></div>';
       document.getElementById('pParts').innerHTML=h;return;
     }
     
     h+='<div class="twrap"><table><thead><tr><th>Part No.</th><th>Name</th><th>Category</th><th>Qty</th><th>Min Qty</th><th>Unit Cost</th><th>Location</th><th>Supplier</th></tr></thead><tbody>';
     _parts.forEach(function(p){
       var qc=p.quantity<=p.min_qty?'qty-low':'qty-ok';
-      var alert=p.quantity<=p.min_qty?'<span class="badge bp-crit" style="font-size:10px">⚠️ Low</span>':'';
+      var alert=p.quantity<=p.min_qty?'<span class="badge bp-crit" style="font-size:10px">â ï¸ Low</span>':'';
       h+='<tr>';
       h+='<td class="tcyan">'+(p.part_no||'-')+'</td>';
       h+='<td><strong>'+p.name+'</strong> '+alert+'</td>';
       h+='<td class="tx2">'+(p.category||'-')+'</td>';
       h+='<td class="'+qc+'">'+p.quantity+'</td>';
       h+='<td class="tx3">'+p.min_qty+'</td>';
-      h+='<td>'+(p.unit_cost?'฿'+p.unit_cost.toLocaleString():'-')+'</td>';
+      h+='<td>'+(p.unit_cost?'à¸¿'+p.unit_cost.toLocaleString():'-')+'</td>';
       h+='<td>'+(p.location||'-')+'</td>';
       h+='<td class="tx2">'+(p.supplier||'-')+'</td>';
       h+='</tr>';
@@ -863,11 +884,11 @@ function loadParts(){
 function loadPM(){
   api('/api/pm-plans').then(function(plans){
     _pms=Array.isArray(plans)?plans:[];
-    var h='<div class="phdr"><div class="ptitle">📅 PM Plans <small>'+_pms.length+' plans</small></div>';
-    h+='<div class="pactions"><button class="btn btn-ai" onclick="aiAnalyzePM()">🤖 PM Analysis</button></div></div>';
+    var h='<div class="phdr"><div class="ptitle">ð PM Plans <small>'+_pms.length+' plans</small></div>';
+    h+='<div class="pactions"><button class="btn btn-ai" onclick="aiAnalyzePM()">ð¤ PM Analysis</button></div></div>';
     
     if(_pms.length===0){
-      h+='<div class="empty"><div class="empty-icon">📅</div><div class="empty-text">No PM plans configured<br><small>Create preventive maintenance plans to reduce breakdowns</small></div></div>';
+      h+='<div class="empty"><div class="empty-icon">ð</div><div class="empty-text">No PM plans configured<br><small>Create preventive maintenance plans to reduce breakdowns</small></div></div>';
       document.getElementById('pPM').innerHTML=h;return;
     }
     
@@ -878,7 +899,7 @@ function loadPM(){
       var isOverdue=due&&due<now;
       var isDueSoon=due&&!isOverdue&&(due-now)<7*86400000;
       var dueClass=isOverdue?'fred':isDueSoon?'famber':'';
-      var dueIcon=isOverdue?'⚠️ ':isDueSoon?'🔔 ':'';
+      var dueIcon=isOverdue?'â ï¸ ':isDueSoon?'ð ':'';
       h+='<tr>';
       h+='<td><strong>'+p.title+'</strong>'+(p.description?'<br><small style="color:var(--tx3)">'+p.description.substring(0,50)+'</small>':'')+'</td>';
       h+='<td class="tcyan">'+(p.asset_name||'-')+'</td>';
@@ -895,18 +916,18 @@ function loadPM(){
 
 // ========== AI PAGE ==========
 function loadAIPage(){
-  var h='<div class="phdr"><div class="ptitle">🤖 AI Analysis Center <small>Powered by Claude AI</small></div></div>';
+  var h='<div class="phdr"><div class="ptitle">ð¤ AI Analysis Center <small>Powered by Claude AI</small></div></div>';
   
   h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:22px">';
   
   // Quick Analysis Cards
   var cards=[
-    {icon:'📊',title:'Dashboard Analysis',desc:'Overall system health & recommendations',fn:'quickAIDash'},
-    {icon:'⚙️',title:'Asset Health Check',desc:'Analyze all equipment health scores',fn:'aiAnalyzeAssets'},
-    {icon:'📋',title:'Work Order Trends',desc:'WO patterns & efficiency insights',fn:'aiAnalyzeWOs'},
-    {icon:'🔩',title:'Inventory Analysis',desc:'Stock levels & procurement recommendations',fn:'aiAnalyzeParts'},
-    {icon:'📅',title:'PM Schedule Review',desc:'Preventive maintenance effectiveness',fn:'aiAnalyzePM'},
-    {icon:'🎯',title:'Maintenance Strategy',desc:'Long-term maintenance optimization plan',fn:'aiStrategy'},
+    {icon:'ð',title:'Dashboard Analysis',desc:'Overall system health & recommendations',fn:'quickAIDash'},
+    {icon:'âï¸',title:'Asset Health Check',desc:'Analyze all equipment health scores',fn:'aiAnalyzeAssets'},
+    {icon:'ð',title:'Work Order Trends',desc:'WO patterns & efficiency insights',fn:'aiAnalyzeWOs'},
+    {icon:'ð©',title:'Inventory Analysis',desc:'Stock levels & procurement recommendations',fn:'aiAnalyzeParts'},
+    {icon:'ð',title:'PM Schedule Review',desc:'Preventive maintenance effectiveness',fn:'aiAnalyzePM'},
+    {icon:'ð¯',title:'Maintenance Strategy',desc:'Long-term maintenance optimization plan',fn:'aiStrategy'},
   ];
   
   cards.forEach(function(c){
@@ -914,14 +935,14 @@ function loadAIPage(){
     h+='<div style="font-size:28px;margin-bottom:10px">'+c.icon+'</div>';
     h+='<div style="font-size:14px;font-weight:700;color:var(--tx);margin-bottom:6px">'+c.title+'</div>';
     h+='<div style="font-size:12px;color:var(--tx3);margin-bottom:12px">'+c.desc+'</div>';
-    h+='<button class="btn btn-ai btn-sm">🤖 Analyze Now</button>';
+    h+='<button class="btn btn-ai btn-sm">ð¤ Analyze Now</button>';
     h+='</div>';
   });
   h+='</div>';
   
   // AI Chat Section
   h+='<div class="ai-panel">';
-  h+='<div class="ai-header"><span class="ai-icon">💬</span><span class="ai-title">Ask AI About Your Maintenance</span></div>';
+  h+='<div class="ai-header"><span class="ai-icon">ð¬</span><span class="ai-title">Ask AI About Your Maintenance</span></div>';
   h+='<div style="display:flex;gap:10px;margin-bottom:12px">';
   h+='<input type="text" class="fi" id="aiQuestion" placeholder="e.g. Which equipment needs immediate attention? What caused the most downtime?" style="flex:1" onkeydown="if(event.key===\'Enter\')askAI()">';
   h+='<button class="btn btn-ai" onclick="askAI()">Ask AI</button>';
@@ -997,7 +1018,7 @@ function aiAnalyzeParts(){
     ctx+='Total Parts: '+parts.length+', Low Stock Items: '+d.low_stock_count+'\n\n';
     parts.forEach(function(p){
       ctx+='- '+p.name+(p.part_no?' ('+p.part_no+')':'')+': Qty='+p.quantity+'/Min='+p.min_qty;
-      if(p.unit_cost)ctx+=', Cost=฿'+p.unit_cost;
+      if(p.unit_cost)ctx+=', Cost=à¸¿'+p.unit_cost;
       if(p.supplier)ctx+=', Supplier='+p.supplier;
       ctx+=p.quantity<=p.min_qty?' [LOW STOCK]':'';
       ctx+='\n';
@@ -1106,16 +1127,16 @@ function callAI(prompt, targetId){
       text=text.replace(/###\s*(.*)/g,'<div style="font-size:13px;font-weight:700;color:var(--purple);margin:12px 0 6px">$1</div>');
       text=text.replace(/##\s*(.*)/g,'<div style="font-size:14px;font-weight:700;color:var(--blue);margin:14px 0 8px">$1</div>');
       text=text.replace(/\n(\d+\.\s)/g,'\n<span style="color:var(--blue);font-weight:700">$1</span>');
-      text=text.replace(/\n-\s/g,'\n<span style="color:var(--tx3)">• </span>');
+      text=text.replace(/\n-\s/g,'\n<span style="color:var(--tx3)">â¢ </span>');
       el.innerHTML=text;
     }else if(d.error){
-      el.innerHTML='<span style="color:var(--red)">⚠️ AI Error: '+d.error.message+'</span>';
+      el.innerHTML='<span style="color:var(--red)">â ï¸ AI Error: '+d.error.message+'</span>';
     }else{
       el.innerHTML='<span style="color:var(--tx3)">No response received</span>';
     }
   }).catch(function(e){
     var el=document.getElementById(targetId);
-    if(el)el.innerHTML='<span style="color:var(--red)">⚠️ Connection error: '+e.message+'</span>';
+    if(el)el.innerHTML='<span style="color:var(--red)">â ï¸ Connection error: '+e.message+'</span>';
   });
 }
 
@@ -1132,7 +1153,7 @@ function submitPub(){
   .then(function(r){return r.json();})
   .then(function(d){
     if(d.wo_number){
-      toast('✅ Request submitted! WO#: '+d.wo_number,'ok');
+      toast('â Request submitted! WO#: '+d.wo_number,'ok');
       closeModal('pubModal');
       document.getElementById('pt').value='';
       document.getElementById('pn').value='';
