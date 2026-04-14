@@ -1,228 +1,1165 @@
-<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CMMS PRO</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js">
-function loadAIPage(){
-  var h='<div class="phdr"><div class="ptitle">AI Analysis</div></div>';
-  h+='<div class="aigrid">';
-  [["aiDash","Dashboard Insight","Overall health and recommendations"],
-   ["aiAssets","Asset Health Check","Equipment analysis and risks"],
-   ["aiWOs","WO Trend Analysis","Patterns and efficiency insights"],
-   ["aiParts","Inventory Analysis","Stock and procurement advice"],
-   ["aiPM","PM Review","Maintenance schedule effectiveness"],
-   ["aiStrategy","Full Strategy","Complete maintenance optimization"]
-  ].forEach(function(c){
-    h+='<div class="aicard" onclick="'+c[0]+'()"><div style="font-size:28px;margin-bottom:8px">AI</div>';
-    h+='<div style="font-size:14px;font-weight:700;color:var(--tx);margin-bottom:4px">'+c[1]+'</div>';
-    h+='<div style="font-size:12px;color:var(--tx3)">'+c[2]+'</div></div>';
-  });
-  h+='</div><div class="aip"><div class="ait">Ask AI About Your Maintenance</div>';
-  h+='<div style="display:flex;gap:8px;margin-bottom:10px">';
-  h+='<input type="text" class="fi" id="aiQ" placeholder="e.g. Which equipment needs attention?" style="flex:1" onkeydown="if(event.key==='Enter')askAI()">';
-  h+='<button class="btn btn-ai" onclick="askAI()">Ask AI</button></div>';
-  h+='<div class="aib" id="aiChat">Ask any question about your maintenance operations.</div></div>';
-  document.getElementById("pAI").innerHTML=h;
-}
-function callAI(prompt,elId){
-  var el=document.getElementById(elId);if(!el)return;
-  el.innerHTML='<div style="color:#4a6080">Analyzing... <span class="ads"><span></span><span></span><span></span></span></div>';
-  fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})
-  }).then(function(r){return r.json();}).then(function(d){
-    if(d.content&&d.content[0]&&d.content[0].text){
-      var t=d.content[0].text.replace(/**(.*?)**/g,'<strong style="color:var(--tx)">$1</strong>').replace(/##s*(.*)/g,'<div style="font-weight:700;color:#3d8fff;margin:8px 0 4px">$1</div>');
-      el.innerHTML=t;
-    }else el.innerHTML='<span style="color:var(--red)">Error: '+(d.error&&d.error.message||JSON.stringify(d))+'</span>';
-  }).catch(function(e){el.innerHTML='<span style="color:var(--red)">Error: '+e.message+'</span>';});
-}
-function getCtx(cb){
-  Promise.all([api("/api/kpi/summary"),api("/api/assets"),api("/api/work-orders"),api("/api/spare-parts")]).then(function(r){
-    var s=(r[0].summary||r[0])||{};
-    var ctx="System KPIs: Total WOs="+s.total+", Open="+s.open+", InProgress="+s.inprog+", Completed="+s.completed+", Overdue="+s.overdue+", Critical="+s.critical+", AvgMTTR="+s.avgMttr+"h
-";
-    ctx+="Assets("+((Array.isArray(r[1])?r[1]:[]).length)+"): "+(Array.isArray(r[1])?r[1]:[]).map(function(a){return a.code+"("+a.type+",health:"+a.health_score+"%)";}).join(", ")+"
-";
-    ctx+="LowStock: "+((r[3].parts||[]).filter(function(p){return p.quantity<=p.min_qty;}).map(function(p){return p.name+"("+p.quantity+"/"+p.min_qty+")";}).join(", ")||"none");
-    cb(ctx);
-  });
-}
-function showAIResult(title,prompt){
-  var existing=document.getElementById("aiResultModal");if(existing)existing.remove();
-  var mo=document.createElement("div");mo.id="aiResultModal";
-  mo.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px";
-  mo.innerHTML='<div style="background:var(--bg2);border:1px solid rgba(157,111,255,.3);border-radius:14px;padding:24px;width:100%;max-width:680px;max-height:85vh;overflow-y:auto"><div style="font-size:16px;font-weight:700;margin-bottom:16px;color:#9d6fff">'+title+'</div><div class="aib" id="aiModalBody">Loading...</div><div style="margin-top:16px;text-align:right"><button class="btn btn-s" onclick="document.getElementById('aiResultModal').remove()">Close</button></div></div>';
-  document.body.appendChild(mo);
-  mo.addEventListener("click",function(e){if(e.target===mo)mo.remove();});
-  callAI(prompt,"aiModalBody");
-}
-function aiDash(){getCtx(function(ctx){showAIResult("Dashboard Insight","CMMS maintenance expert: Analyze this dashboard and give: 1) Overall health assessment 2) Top 3 concerns 3) Recommended immediate actions. Be concise and practical.
-
-"+ctx);});}
-function aiAssets(){getCtx(function(ctx){showAIResult("Asset Health Check","Maintenance engineer: Analyze assets and provide: 1) Critical assets needing attention 2) Replacement recommendations 3) PM priorities
-
-"+ctx);});}
-function aiWOs(){getCtx(function(ctx){showAIResult("Work Order Analysis","CMMS expert: Analyze work orders and provide: 1) Efficiency assessment 2) Patterns and recurring issues 3) Staff workload insights 4) Improvement actions
-
-"+ctx);});}
-function aiParts(){getCtx(function(ctx){showAIResult("Inventory Analysis","Inventory expert: 1) Stock-out risks 2) Reorder recommendations 3) Cost optimization opportunities
-
-"+ctx);});}
-function aiPM(){getCtx(function(ctx){showAIResult("PM Schedule Review","Maintenance planner: 1) PM program effectiveness 2) Overdue items 3) Interval optimization 4) ROI improvements
-
-"+ctx);});}
-function aiStrategy(){getCtx(function(ctx){showAIResult("Maintenance Strategy","Senior consultant: Develop strategy with 1) Current maturity assessment 2) 30-day critical actions 3) 90-day improvement plan 4) KPI targets 5) Technology recommendations
-
-"+ctx);});}
-function askAI(){var q=(document.getElementById("aiQ")||{}).value||"";if(!q){toast("Please enter a question","err");return;}getCtx(function(ctx){callAI("CMMS maintenance advisor - Answer this question based on system data:
-
-Question: "+q+"
-
-System Data:
-"+ctx+"
-
-Provide specific, actionable advice.","aiChat");});}
-</script>
+<title>CMMS PRO v4</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#0a0e1a;--bg2:#0f1629;--bg3:#141e35;--bd:rgba(40,70,140,.4);--bd2:rgba(60,100,200,.5);--tx:#c8d8f0;--tx2:#7a9cc8;--tx3:#4a6888;--blue:#4d9fff;--blue2:#1a5fcc;--green:#00c87a;--amber:#ffb800;--red:#ff3d5a;--cyan:#00e5ff;}
-html,body{height:100%;font-family:sans-serif;background:var(--bg);color:var(--tx);font-size:14px}
-#loginPage{display:flex;align-items:center;justify-content:center;min-height:100vh}
-.lcard{background:var(--bg2);border:1px solid var(--bd2);border-radius:16px;padding:40px 36px;width:360px;text-align:center}
-.logo{font-size:32px;font-weight:800;color:var(--blue);margin-bottom:4px}
-.sub{font-size:12px;color:var(--tx3);margin-bottom:28px}
-.tabs{display:flex;gap:8px;margin-bottom:20px;background:var(--bg3);border-radius:8px;padding:4px}
-.tab{flex:1;padding:8px;border-radius:6px;border:none;background:none;color:var(--tx2);cursor:pointer;font-size:13px}
-.tab.active{background:var(--blue2);color:white}
-.lbl{font-size:11px;color:var(--tx3);text-align:left;margin-bottom:5px;text-transform:uppercase}
-.linput{width:100%;background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;color:var(--tx);font-size:16px;letter-spacing:4px;text-align:center;outline:none;margin-bottom:16px}
-.linput:focus{border-color:var(--blue)}
-.lbtn{width:100%;padding:12px;background:var(--blue2);border:none;border-radius:8px;color:white;font-size:15px;font-weight:600;cursor:pointer}
-.lbtn:hover{background:#1d6be0}
-.lerr{color:var(--red);font-size:12px;margin-top:8px;min-height:16px}
-.lpub{margin-top:20px;padding-top:16px;border-top:1px solid var(--bd);font-size:12px;color:var(--tx3)}
-.lpub a{color:var(--blue);cursor:pointer}
+:root{
+  --bg:#080c18;--bg2:#0d1225;--bg3:#121a30;--bg4:#1a2440;
+  --bd:rgba(50,80,160,.35);--bd2:rgba(70,120,220,.5);--bd3:rgba(70,120,220,.2);
+  --tx:#ccd6f0;--tx2:#7a9fc8;--tx3:#4a6080;
+  --blue:#3d8fff;--blue2:#1a5fcc;--blue3:#0d3a8c;
+  --green:#00d474;--amber:#ffc107;--red:#ff4060;--purple:#9d6fff;--cyan:#00e5ff;
+  --success-bg:rgba(0,212,116,.1);--warn-bg:rgba(255,193,7,.1);--error-bg:rgba(255,64,96,.1);
+}
+html,body{height:100%;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--tx);font-size:14px;overflow:hidden}
+
+/* LOGIN */
+#loginPage{display:flex;align-items:center;justify-content:center;height:100vh;
+  background:radial-gradient(ellipse at 20% 60%,rgba(29,95,204,.12) 0,transparent 60%),
+             radial-gradient(ellipse at 80% 20%,rgba(157,111,255,.08) 0,transparent 50%),var(--bg)}
+.lcard{background:linear-gradient(135deg,var(--bg2) 0,var(--bg3) 100%);
+  border:1px solid var(--bd2);border-radius:20px;padding:44px 40px;width:380px;text-align:center;
+  box-shadow:0 20px 60px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05)}
+.lcard::before{content:'';position:absolute;top:0;left:10%;right:10%;height:1px;
+  background:linear-gradient(90deg,transparent,var(--blue),transparent);border-radius:50%}
+.lcard{position:relative}
+.logo-icon{font-size:40px;margin-bottom:8px}
+.logo-text{font-size:28px;font-weight:800;color:var(--blue);letter-spacing:3px;margin-bottom:2px}
+.logo-ver{font-size:11px;color:var(--tx3);letter-spacing:2px;margin-bottom:6px}
+.logo-sub{font-size:12px;color:var(--tx3);margin-bottom:28px}
+.rtabs{display:flex;gap:6px;margin-bottom:22px;background:var(--bg);border-radius:10px;padding:4px}
+.rtab{flex:1;padding:9px;border-radius:8px;border:none;background:none;color:var(--tx2);cursor:pointer;font-size:13px;font-weight:500;transition:all .2s}
+.rtab.active{background:var(--blue2);color:#fff;box-shadow:0 4px 12px rgba(26,95,204,.4)}
+.flbl{font-size:10px;color:var(--tx3);text-align:left;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;display:block}
+.finput{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:10px;
+  padding:12px 16px;color:var(--tx);font-size:18px;letter-spacing:6px;text-align:center;
+  outline:none;transition:all .2s;margin-bottom:18px}
+.finput:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(61,143,255,.15)}
+.fbtn{width:100%;padding:13px;background:linear-gradient(135deg,var(--blue2),var(--blue3));
+  border:none;border-radius:10px;color:white;font-size:15px;font-weight:700;cursor:pointer;
+  transition:all .2s;letter-spacing:.5px;box-shadow:0 4px 16px rgba(26,95,204,.3)}
+.fbtn:hover{background:linear-gradient(135deg,#2070e0,var(--blue2));transform:translateY(-1px);box-shadow:0 6px 20px rgba(26,95,204,.4)}
+.fbtn:active{transform:translateY(0)}
+.lerr{color:var(--red);font-size:12px;margin-top:10px;min-height:18px;background:var(--error-bg);border-radius:6px;padding:0}
+.lerr.show{padding:8px 12px}
+.lpub{margin-top:22px;padding-top:18px;border-top:1px solid var(--bd3);font-size:12px;color:var(--tx3)}
+.lpub a{color:var(--blue);cursor:pointer;font-weight:500;text-decoration:none}
+.lpub a:hover{color:#6fb3ff}
+
+/* APP SHELL */
 #appPage{display:none;height:100vh;flex-direction:column}
-.topbar{background:var(--bg2);border-bottom:1px solid var(--bd);padding:0 20px;height:50px;display:flex;align-items:center;gap:12px;flex-shrink:0}
-.alogo{font-size:16px;font-weight:800;color:var(--blue);margin-right:auto}
-.clk{font-size:11px;color:var(--cyan);background:var(--bg3);border:1px solid var(--bd);padding:3px 9px;border-radius:4px;font-family:monospace}
-.uchip{font-size:12px;color:var(--tx2);background:var(--bg3);border:1px solid var(--bd);padding:4px 10px;border-radius:6px}
-.lout{background:none;border:1px solid rgba(255,61,90,.3);border-radius:6px;padding:5px 10px;color:var(--red);cursor:pointer;font-size:12px}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--bd);
+  padding:0 20px;height:52px;display:flex;align-items:center;gap:12px;flex-shrink:0;
+  box-shadow:0 1px 20px rgba(0,0,0,.3)}
+.alogo{font-size:17px;font-weight:800;color:var(--blue);letter-spacing:2px;margin-right:auto}
+.alogo span{color:var(--tx3);font-size:11px;font-weight:400;letter-spacing:1px;display:block;margin-top:-2px}
+.clk{font-size:12px;color:var(--cyan);background:var(--bg3);border:1px solid var(--bd);
+  padding:4px 10px;border-radius:6px;font-family:monospace;letter-spacing:.5px}
+.uchip{font-size:12px;color:var(--tx2);background:var(--bg3);border:1px solid var(--bd);
+  padding:5px 12px;border-radius:8px;display:flex;align-items:center;gap:6px}
+.urole-badge{background:var(--blue3);color:var(--blue);padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;text-transform:uppercase}
+.lout{background:none;border:1px solid rgba(255,64,96,.3);border-radius:8px;
+  padding:6px 12px;color:var(--red);cursor:pointer;font-size:12px;font-weight:600;transition:all .2s}
+.lout:hover{background:rgba(255,64,96,.1)}
 .bwrap{display:flex;flex:1;overflow:hidden}
-.sidebar{width:200px;background:var(--bg2);border-right:1px solid var(--bd);flex-shrink:0;overflow-y:auto}
-.ni{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--tx3);border-left:2px solid transparent;font-size:13px;transition:all .15s}
-.ni:hover,.ni.active{background:rgba(77,159,255,.08);color:var(--tx);border-left-color:var(--blue)}
-.ni.active{color:var(--blue)}
-.content{flex:1;overflow-y:auto;padding:20px}
-.page{display:none}.page.active{display:block}
-.kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:20px}
-.kcard{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:16px}
-.kval{font-size:28px;font-weight:700;color:var(--blue);margin-bottom:4px}
-.kval.green{color:var(--green)}.kval.amber{color:var(--amber)}.kval.red{color:var(--red)}.kval.cyan{color:var(--cyan)}
-.klbl{font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px}
-.twrap{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin-top:8px}
+
+/* SIDEBAR */
+.sidebar{width:210px;background:var(--bg2);border-right:1px solid var(--bd);
+  display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+.sb-logo{padding:16px 16px 8px;font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:2px;font-weight:600;border-bottom:1px solid var(--bd3);margin-bottom:8px}
+.nsec{padding:10px 16px 4px;font-size:9px;color:var(--tx3);text-transform:uppercase;letter-spacing:1.5px;font-weight:600}
+.ni{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;
+  color:var(--tx3);border-left:3px solid transparent;font-size:13px;transition:all .15s;font-weight:500}
+.ni:hover{background:rgba(61,143,255,.06);color:var(--tx);border-left-color:rgba(61,143,255,.3)}
+.ni.active{background:rgba(61,143,255,.1);color:var(--blue);border-left-color:var(--blue)}
+.ni-icon{width:20px;text-align:center;font-size:15px}
+.ni-badge{margin-left:auto;background:var(--red);color:#fff;font-size:9px;font-weight:700;
+  padding:1px 5px;border-radius:10px;min-width:16px;text-align:center}
+
+/* CONTENT */
+.content{flex:1;overflow-y:auto;background:var(--bg)}
+.page{display:none;padding:22px}.page.active{display:block}
+
+/* PAGE HEADER */
+.phdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px}
+.ptitle{font-size:20px;font-weight:700;color:var(--tx)}
+.ptitle small{font-size:12px;color:var(--tx3);font-weight:400;margin-left:8px}
+.pactions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* BUTTONS */
+.btn{padding:9px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--blue2);color:#fff}.btn-primary:hover{background:#2070e0;transform:translateY(-1px)}
+.btn-secondary{background:var(--bg3);color:var(--tx2);border:1px solid var(--bd)}.btn-secondary:hover{background:var(--bg4)}
+.btn-success{background:rgba(0,212,116,.15);color:var(--green);border:1px solid rgba(0,212,116,.3)}.btn-success:hover{background:rgba(0,212,116,.25)}
+.btn-danger{background:rgba(255,64,96,.15);color:var(--red);border:1px solid rgba(255,64,96,.3)}.btn-danger:hover{background:rgba(255,64,96,.25)}
+.btn-ai{background:linear-gradient(135deg,rgba(157,111,255,.2),rgba(61,143,255,.2));
+  color:var(--purple);border:1px solid rgba(157,111,255,.4);position:relative;overflow:hidden}
+.btn-ai:hover{background:linear-gradient(135deg,rgba(157,111,255,.3),rgba(61,143,255,.3));transform:translateY(-1px)}
+.btn-sm{padding:6px 12px;font-size:12px;border-radius:6px}
+
+/* KPI GRID */
+.kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:22px}
+.kcard{background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:18px;
+  transition:all .2s;position:relative;overflow:hidden}
+.kcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--card-color,var(--blue)),transparent)}
+.kcard:hover{border-color:var(--card-color,var(--blue));box-shadow:0 4px 20px rgba(0,0,0,.2)}
+.kval{font-size:32px;font-weight:800;color:var(--card-color,var(--blue));margin-bottom:4px;line-height:1}
+.klbl{font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px;font-weight:600}
+.ktrend{font-size:11px;color:var(--tx3);margin-top:6px}
+
+/* CHARTS */
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:22px}
+.chart-box{background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:18px}
+.chart-title{font-size:13px;font-weight:600;color:var(--tx2);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+@media(max-width:800px){.chart-grid{grid-template-columns:1fr}}
+
+/* TABLE */
+.twrap{background:var(--bg2);border:1px solid var(--bd);border-radius:12px;overflow:hidden}
+.twrap .tbar{padding:14px 18px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tsearch{background:var(--bg3);border:1px solid var(--bd);border-radius:7px;
+  padding:7px 12px;color:var(--tx);font-size:13px;outline:none;width:220px;transition:border-color .2s}
+.tsearch:focus{border-color:var(--blue)}
 table{width:100%;border-collapse:collapse}
-th{padding:10px 14px;text-align:left;font-size:11px;color:var(--tx3);text-transform:uppercase;border-bottom:1px solid var(--bd);background:var(--bg3)}
-td{padding:10px 14px;font-size:13px;border-bottom:1px solid rgba(40,70,140,.2)}
-tr:hover td{background:rgba(77,159,255,.04)}
-.code{color:var(--blue);font-family:monospace}.cyan{color:var(--cyan);font-family:monospace}
-.tx2{color:var(--tx2)}.tx3{color:var(--tx3)}.amber{color:var(--amber)}
-.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
-.b-open{background:rgba(77,159,255,.15);color:var(--blue)}.b-inp{background:rgba(255,184,0,.15);color:var(--amber)}
-.b-done{background:rgba(0,200,122,.15);color:var(--green)}.b-over{background:rgba(255,61,90,.15);color:var(--red)}
-.b-crit{background:rgba(255,61,90,.15);color:var(--red)}.b-high{background:rgba(255,184,0,.15);color:var(--amber)}
-.b-med{background:rgba(77,159,255,.15);color:var(--blue)}.b-low{background:rgba(74,104,136,.15);color:var(--tx3)}
-.b-act{background:rgba(0,200,122,.15);color:var(--green)}
-.qty-ok{color:var(--green);font-weight:700}.qty-low{color:var(--red);font-weight:700}
-.moverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center}
+th{padding:11px 16px;text-align:left;font-size:11px;color:var(--tx3);text-transform:uppercase;
+  letter-spacing:.8px;border-bottom:1px solid var(--bd);background:var(--bg3);font-weight:600;white-space:nowrap}
+td{padding:12px 16px;font-size:13px;border-bottom:1px solid rgba(50,80,160,.15);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(61,143,255,.04)}
+.tfoot{padding:12px 18px;border-top:1px solid var(--bd);font-size:12px;color:var(--tx3);display:flex;align-items:center;justify-content:space-between}
+.tcode{color:var(--blue);font-family:monospace;font-weight:600}
+.tcyan{color:var(--cyan);font-family:monospace;font-weight:600}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700;white-space:nowrap}
+.badge::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+.bs-open{background:rgba(61,143,255,.15);color:var(--blue)}
+.bs-inp{background:rgba(255,193,7,.15);color:var(--amber)}
+.bs-done{background:rgba(0,212,116,.15);color:var(--green)}
+.bs-over{background:rgba(255,64,96,.15);color:var(--red)}
+.bp-crit{background:rgba(255,64,96,.15);color:var(--red)}
+.bp-high{background:rgba(255,193,7,.15);color:var(--amber)}
+.bp-med{background:rgba(61,143,255,.15);color:var(--blue)}
+.bp-low{background:rgba(74,96,128,.15);color:var(--tx3)}
+.bs-act{background:rgba(0,212,116,.15);color:var(--green)}
+.bs-inact{background:rgba(255,64,96,.15);color:var(--red)}
+.qty-ok{color:var(--green);font-weight:700}
+.qty-low{color:var(--red);font-weight:700}
+.famber{color:var(--amber)}.fgreen{color:var(--green)}.fred{color:var(--red)}
+
+/* MODAL */
+.moverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;
+  align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)}
 .moverlay.active{display:flex}
-.modal{background:var(--bg2);border:1px solid var(--bd2);border-radius:12px;padding:24px;width:90%;max-width:480px;max-height:85vh;overflow-y:auto}
-.modal h3{font-size:16px;font-weight:700;margin-bottom:18px}
-.fg{margin-bottom:14px}.fl{font-size:11px;color:var(--tx3);display:block;margin-bottom:5px;text-transform:uppercase}
-.fi,.fsel,.fta{width:100%;background:var(--bg3);border:1px solid var(--bd);border-radius:7px;padding:9px 12px;color:var(--tx);font-size:13px;outline:none}
-.fi:focus,.fsel:focus,.fta:focus{border-color:var(--blue)}.fta{resize:vertical;min-height:80px}
-.mfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
-.btn{padding:9px 18px;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:600}
-.btn-p{background:var(--blue2);color:white}.btn-p:hover{background:#1d6be0}
-.btn-s{background:var(--bg3);color:var(--tx2);border:1px solid var(--bd)}
-.toast{position:fixed;bottom:20px;right:20px;background:var(--bg2);border:1px solid var(--bd2);border-radius:8px;padding:12px 18px;font-size:13px;z-index:999;transform:translateY(100px);opacity:0;transition:all .3s}
-.toast.show{transform:translateY(0);opacity:1}.toast.ok{border-color:var(--green);color:var(--green)}.toast.err{border-color:var(--red);color:var(--red)}
-.phdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
-.ptitle{font-size:18px;font-weight:700}.sbt{padding:16px;font-weight:700;font-size:13px;color:var(--tx2)}.nodata{text-align:center;padding:40px;color:var(--tx3)}
-.aip{background:linear-gradient(135deg,rgba(157,111,255,.08),rgba(61,143,255,.06));border:1px solid rgba(157,111,255,.25);border-radius:12px;padding:18px;margin-bottom:18px}.ait{font-size:14px;font-weight:700;color:#9d6fff;margin-bottom:10px}.aib{background:rgba(0,0,0,.25);border-radius:8px;padding:14px;font-size:13px;line-height:1.7;color:#7a9fc8;min-height:50px;white-space:pre-wrap}.ads span{animation:dk 1.2s infinite;display:inline-block;width:6px;height:6px;border-radius:50%;background:#9d6fff;margin:0 2px}.ads span:nth-child(2){animation-delay:.2s}.ads span:nth-child(3){animation-delay:.4s}@keyframes dk{0%,80%,100%{transform:scale(.7);opacity:.5}40%{transform:scale(1);opacity:1}}.aigrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:18px}.aicard{background:var(--bg2);border:1px solid rgba(157,111,255,.2);border-radius:10px;padding:14px;cursor:pointer;transition:all .2s}.aicard:hover{border-color:rgba(157,111,255,.5)}.btn-ai{background:linear-gradient(135deg,rgba(157,111,255,.2),rgba(61,143,255,.2));color:#9d6fff;border:1px solid rgba(157,111,255,.4)}.btn-ai:hover{background:linear-gradient(135deg,rgba(157,111,255,.3),rgba(61,143,255,.3))}</style></head><body>
-<div id="loginPage"><div class="lcard">
-<div class="logo">CMMS PRO</div>
-<div class="sub">Maintenance Management System v3.0</div>
-<div class="tabs">
-<button class="tab active" id="tabAdmin" onclick="setRole('admin')">Admin</button>
-<button class="tab" id="tabTech" onclick="setRole('tech')">Technician</button>
+.modal{background:var(--bg2);border:1px solid var(--bd2);border-radius:16px;
+  padding:28px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;
+  box-shadow:0 24px 80px rgba(0,0,0,.6);animation:mslide .2s ease}
+.modal.modal-lg{max-width:750px}
+@keyframes mslide{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}}
+.modal h3{font-size:17px;font-weight:700;margin-bottom:20px;color:var(--tx);display:flex;align-items:center;gap:10px}
+.fg{margin-bottom:16px}
+.fl{font-size:11px;color:var(--tx3);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.7px;font-weight:600}
+.fi,.fsel,.fta{width:100%;background:var(--bg3);border:1px solid var(--bd);border-radius:8px;
+  padding:10px 13px;color:var(--tx);font-size:13px;outline:none;transition:border-color .2s;font-family:inherit}
+.fi:focus,.fsel:focus,.fta:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(61,143,255,.1)}
+.fta{resize:vertical;min-height:88px}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:22px;border-top:1px solid var(--bd);padding-top:18px}
+
+/* TOAST */
+.toast{position:fixed;bottom:22px;right:22px;background:var(--bg2);border:1px solid var(--bd);
+  border-radius:10px;padding:13px 18px;font-size:13px;z-index:9999;
+  transform:translateY(80px) scale(.95);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);
+  display:flex;align-items:center;gap:10px;max-width:320px;pointer-events:none;
+  box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.toast.show{transform:translateY(0) scale(1);opacity:1}
+.toast.ok{border-color:var(--green);color:var(--green)}
+.toast.err{border-color:var(--red);color:var(--red)}
+.toast.info{border-color:var(--blue);color:var(--blue)}
+
+/* EMPTY STATE */
+.empty{text-align:center;padding:50px 20px;color:var(--tx3)}
+.empty-icon{font-size:48px;margin-bottom:12px;opacity:.5}
+.empty-text{font-size:14px;color:var(--tx3)}
+
+/* AI SECTION */
+.ai-panel{background:linear-gradient(135deg,rgba(157,111,255,.08) 0,rgba(61,143,255,.06) 100%);
+  border:1px solid rgba(157,111,255,.25);border-radius:14px;padding:20px;margin-bottom:22px}
+.ai-header{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.ai-icon{font-size:22px}
+.ai-title{font-size:15px;font-weight:700;color:var(--purple)}
+.ai-subtitle{font-size:12px;color:var(--tx3);margin-left:auto}
+.ai-content{background:rgba(0,0,0,.2);border-radius:10px;padding:16px;font-size:13px;
+  line-height:1.7;color:var(--tx2);min-height:60px;white-space:pre-wrap}
+.ai-loading{display:flex;align-items:center;gap:10px;color:var(--tx3);font-size:13px}
+.ai-dots span{animation:dot 1.4s infinite;display:inline-block;width:6px;height:6px;
+  border-radius:50%;background:var(--purple);margin:0 2px}
+.ai-dots span:nth-child(2){animation-delay:.2s}
+.ai-dots span:nth-child(3){animation-delay:.4s}
+@keyframes dot{0%,80%,100%{transform:scale(.8);opacity:.5}40%{transform:scale(1.2);opacity:1}}
+.ai-card{background:var(--bg2);border:1px solid rgba(157,111,255,.2);border-radius:10px;padding:16px;margin-bottom:12px}
+.ai-card-title{font-size:12px;font-weight:700;color:var(--purple);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+
+/* DETAIL PANEL */
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.dfield{background:var(--bg3);border:1px solid var(--bd3);border-radius:8px;padding:12px}
+.dfield label{font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px;font-weight:600}
+.dfield .dval{font-size:13px;color:var(--tx);font-weight:500}
+
+/* HEALTH BAR */
+.hbar-wrap{display:flex;align-items:center;gap:8px}
+.hbar{height:6px;border-radius:3px;background:var(--bg3);flex:1;overflow:hidden}
+.hbar-fill{height:100%;border-radius:3px;transition:width .6s ease}
+.hbar-num{font-size:12px;font-weight:700;min-width:30px;text-align:right}
+
+/* TIMELINE */
+.timeline{padding-left:16px;border-left:2px solid var(--bd)}
+.tl-item{position:relative;padding-bottom:16px;padding-left:16px}
+.tl-item::before{content:'';position:absolute;left:-9px;top:4px;width:10px;height:10px;
+  border-radius:50%;background:var(--blue);border:2px solid var(--bg2)}
+.tl-date{font-size:10px;color:var(--tx3);margin-bottom:3px}
+.tl-text{font-size:13px;color:var(--tx2)}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--bd2)}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginPage">
+  <div class="lcard">
+    <div class="logo-icon">⚙️</div>
+    <div class="logo-text">CMMS PRO</div>
+    <div class="logo-ver">VERSION 4.0</div>
+    <div class="logo-sub">AI-Powered Maintenance Management System</div>
+    <div class="rtabs">
+      <button class="rtab active" id="tabAdmin" onclick="setRole('admin')">👑 Admin</button>
+      <button class="rtab" id="tabTech" onclick="setRole('tech')">🔧 Technician</button>
+    </div>
+    <label class="flbl">PIN CODE</label>
+    <input type="password" id="pinIn" class="finput" placeholder="••••" maxlength="8" inputmode="numeric" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="fbtn" onclick="doLogin()">🔐 Login</button>
+    <div class="lerr" id="lerr"></div>
+    <div class="lpub"><a onclick="openModal('pubModal')">📋 Report Issue (No Login Required)</a></div>
+  </div>
 </div>
-<div class="lbl">PIN CODE</div>
-<input type="password" id="pinInput" class="linput" placeholder="&bull;&bull;&bull;&bull;" maxlength="8" inputmode="numeric" onkeydown="if(event.key==='Enter')doLogin()">
-<button class="lbtn" onclick="doLogin()">Login</button>
-<div class="lerr" id="lerr"></div>
-<div class="lpub"><a onclick="openModal('pubModal')">Report an Issue (No Login Required)</a></div>
-</div></div>
+
+<!-- APP -->
 <div id="appPage">
-<div class="topbar"><div class="alogo">CMMS PRO</div>
-<div class="clk" id="clk">--:--:--</div>
-<div class="uchip" id="uchip">User</div>
-<button class="lout" onclick="logout()">Logout</button></div>
-<div class="bwrap"><div class="sidebar" id="sb"></div>
-<div class="content">
-<div class="page active" id="pDash"></div>
-<div class="page" id="pWO"></div>
-<div class="page" id="pAssets"></div>
-<div class="page" id="pParts"></div>
-<div class="page" id="pPM"></div><div class="page" id="pAI"></div>
-</div></div></div>
-<div class="moverlay" id="pubModal"><div class="modal">
-<h3>Report Maintenance Issue</h3>
-<div class="fg"><label class="fl">Issue Title *</label><input type="text" id="pt" class="fi" placeholder="Describe the problem"></div>
-<div class="fg"><label class="fl">Your Name</label><input type="text" id="pn" class="fi"></div>
-<div class="fg"><label class="fl">Contact</label><input type="text" id="pc" class="fi"></div>
-<div class="fg"><label class="fl">Details</label><textarea id="pd" class="fta"></textarea></div>
-<div class="mfoot"><button class="btn btn-s" onclick="closeModal('pubModal')">Cancel</button>
-<button class="btn btn-p" onclick="submitPub()">Submit</button></div>
-</div></div>
-<div class="moverlay" id="woModal"><div class="modal">
-<h3>Create Work Order</h3>
-<div class="fg"><label class="fl">Title *</label><input type="text" id="wt" class="fi"></div>
-<div class="fg"><label class="fl">Asset</label><select id="wa" class="fsel"><option value="">-- Select --</option></select></div>
-<div class="fg"><label class="fl">Type</label><select id="wty" class="fsel"><option value="reactive">Reactive</option><option value="preventive">Preventive</option><option value="inspection">Inspection</option></select></div>
-<div class="fg"><label class="fl">Priority</label><select id="wp" class="fsel"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="critical">Critical</option></select></div>
-<div class="fg"><label class="fl">Assigned To</label><input type="text" id="wass" class="fi"></div>
-<div class="fg"><label class="fl">SLA Hours</label><input type="number" id="wsla" class="fi" value="4" min="1"></div>
-<div class="fg"><label class="fl">Description</label><textarea id="wd" class="fta"></textarea></div>
-<div class="mfoot"><button class="btn btn-s" onclick="closeModal('woModal')">Cancel</button>
-<button class="btn btn-p" onclick="submitWO()">Create</button></div>
-</div></div>
+  <div class="topbar">
+    <div class="alogo">⚙️ CMMS PRO <span>AI-Powered Maintenance v4.0</span></div>
+    <div class="clk" id="clk">--:--:--</div>
+    <div class="uchip" id="uchip"><span>User</span> <span class="urole-badge" id="roleLabel">-</span></div>
+    <button class="lout" onclick="logout()">Logout</button>
+  </div>
+  <div class="bwrap">
+    <div class="sidebar" id="sb">
+      <div class="sb-logo">Menu</div>
+    </div>
+    <div class="content" id="mainContent">
+      <div class="page active" id="pDash"></div>
+      <div class="page" id="pWO"></div>
+      <div class="page" id="pAssets"></div>
+      <div class="page" id="pParts"></div>
+      <div class="page" id="pPM"></div>
+      <div class="page" id="pAI"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PUBLIC MODAL -->
+<div class="moverlay" id="pubModal">
+  <div class="modal">
+    <h3>📋 Report Maintenance Issue</h3>
+    <div class="fg"><label class="fl">Issue Title *</label><input type="text" id="pt" class="fi" placeholder="Describe the problem briefly"></div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Your Name</label><input type="text" id="pn" class="fi"></div>
+      <div class="fg"><label class="fl">Contact</label><input type="text" id="pc" class="fi" placeholder="Phone / Email"></div>
+    </div>
+    <div class="fg"><label class="fl">Details</label><textarea id="pd" class="fta" placeholder="Additional details about the issue..."></textarea></div>
+    <div class="mfoot">
+      <button class="btn btn-secondary" onclick="closeModal('pubModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitPub()">📤 Submit Request</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEW WO MODAL -->
+<div class="moverlay" id="woModal">
+  <div class="modal">
+    <h3 id="woModalTitle">📋 Create Work Order</h3>
+    <div class="fg"><label class="fl">Title *</label><input type="text" id="wt" class="fi" placeholder="Work order title"></div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Asset</label><select id="wa" class="fsel"></select></div>
+      <div class="fg"><label class="fl">Type</label><select id="wty" class="fsel">
+        <option value="reactive">Reactive</option>
+        <option value="preventive">Preventive</option>
+        <option value="inspection">Inspection</option>
+        <option value="emergency">Emergency</option>
+      </select></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Priority</label><select id="wp" class="fsel">
+        <option value="low">🟢 Low</option>
+        <option value="medium" selected>🔵 Medium</option>
+        <option value="high">🟡 High</option>
+        <option value="critical">🔴 Critical</option>
+      </select></div>
+      <div class="fg"><label class="fl">SLA Hours</label><input type="number" id="wsla" class="fi" value="4" min="1" max="720"></div>
+    </div>
+    <div class="fg"><label class="fl">Assigned To</label><input type="text" id="wass" class="fi" placeholder="Technician name"></div>
+    <div class="fg"><label class="fl">Description</label><textarea id="wd" class="fta" placeholder="Detailed description of work to be done..."></textarea></div>
+    <div class="mfoot">
+      <button class="btn btn-secondary" onclick="closeModal('woModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitWO()">✅ Create Work Order</button>
+    </div>
+  </div>
+</div>
+
+<!-- WO DETAIL MODAL -->
+<div class="moverlay" id="woDetailModal">
+  <div class="modal modal-lg">
+    <h3 id="woDetailTitle">Work Order Details</h3>
+    <div id="woDetailBody"></div>
+    <div class="mfoot">
+      <button class="btn btn-secondary" onclick="closeModal('woDetailModal')">Close</button>
+      <button class="btn btn-primary" id="woUpdateBtn" onclick="updateWOStatus()">Update Status</button>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS UPDATE MODAL -->
+<div class="moverlay" id="statusModal">
+  <div class="modal">
+    <h3>🔄 Update Work Order Status</h3>
+    <input type="hidden" id="statusWoId">
+    <div class="fg"><label class="fl">New Status</label><select id="newStatus" class="fsel">
+      <option value="open">📬 Open</option>
+      <option value="in_progress">🔧 In Progress</option>
+      <option value="completed">✅ Completed</option>
+      <option value="cancelled">❌ Cancelled</option>
+    </select></div>
+    <div class="fg"><label class="fl">Root Cause</label><input type="text" id="rootCause" class="fi" placeholder="Root cause of problem"></div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Labor Hours</label><input type="number" id="laborHours" class="fi" placeholder="0.0" step="0.5"></div>
+      <div class="fg"><label class="fl">Parts Used</label><input type="text" id="partsUsed" class="fi" placeholder="Parts list"></div>
+    </div>
+    <div class="fg"><label class="fl">Notes</label><textarea id="statusNotes" class="fta" rows="3"></textarea></div>
+    <div class="mfoot">
+      <button class="btn btn-secondary" onclick="closeModal('statusModal')">Cancel</button>
+      <button class="btn btn-success" onclick="submitStatus()">✅ Update</button>
+    </div>
+  </div>
+</div>
+
+<!-- ASSET MODAL -->
+<div class="moverlay" id="assetModal">
+  <div class="modal">
+    <h3>⚙️ Add Asset</h3>
+    <div class="frow">
+      <div class="fg"><label class="fl">Code *</label><input type="text" id="aCode" class="fi" placeholder="e.g. PUMP-01"></div>
+      <div class="fg"><label class="fl">Name *</label><input type="text" id="aName" class="fi"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Type</label><select id="aType" class="fsel">
+        <option>General</option><option>Mechanical</option><option>Electrical</option>
+        <option>HVAC</option><option>Power</option><option>Generator</option>
+        <option>Hydraulic</option><option>Pneumatic</option><option>IT/Network</option>
+      </select></div>
+      <div class="fg"><label class="fl">Location</label><input type="text" id="aLoc" class="fi"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Manufacturer</label><input type="text" id="aMfr" class="fi"></div>
+      <div class="fg"><label class="fl">Model</label><input type="text" id="aModel" class="fi"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">Serial No.</label><input type="text" id="aSn" class="fi"></div>
+      <div class="fg"><label class="fl">Install Date</label><input type="date" id="aInstall" class="fi"></div>
+    </div>
+    <div class="fg"><label class="fl">Notes</label><textarea id="aNotes" class="fta" rows="2"></textarea></div>
+    <div class="mfoot">
+      <button class="btn btn-secondary" onclick="closeModal('assetModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAsset()">✅ Add Asset</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI ANALYSIS MODAL -->
+<div class="moverlay" id="aiModal">
+  <div class="modal modal-lg">
+    <h3>🤖 AI Analysis</h3>
+    <div id="aiModalBody">
+      <div class="ai-loading"><div class="ai-dots"><span></span><span></span><span></span></div> Analyzing...</div>
+    </div>
+    <div class="mfoot">
+      <button class="btn btn-secondary" onclick="closeModal('aiModal')">Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
+
 <script>
-var T=localStorage.getItem("ct")||"";
-var R=localStorage.getItem("cr")||"";
-var N=localStorage.getItem("cn")||"";
-var CR="admin";
-if(T){showApp();navTo("Dash");}else{showLogin();}
-function setRole(r){CR=r;document.getElementById("tabAdmin").classList.toggle("active",r==="admin");document.getElementById("tabTech").classList.toggle("active",r==="tech");}
-function doLogin(){var p=document.getElementById("pinInput").value;if(!p)return;fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({role:CR,pin:p})}).then(function(r){return r.json();}).then(function(d){if(d.token){T=d.token;R=d.role;N=d.name;localStorage.setItem("ct",T);localStorage.setItem("cr",R);localStorage.setItem("cn",N);showApp();navTo("Dash");}else{document.getElementById("lerr").textContent=d.error||"Login failed";}});}
-function logout(){T="";R="";N="";localStorage.removeItem("ct");localStorage.removeItem("cr");localStorage.removeItem("cn");showLogin();}
-function showLogin(){document.getElementById("loginPage").style.display="flex";document.getElementById("appPage").style.display="none";}
-function showApp(){document.getElementById("loginPage").style.display="none";document.getElementById("appPage").style.display="flex";document.getElementById("uchip").textContent=N+" ("+R+")";renderSB();setInterval(function(){document.getElementById("clk").textContent=new Date().toLocaleTimeString("th-TH",{timeZone:"Asia/Bangkok"});},1000);}
-function renderSB(){var items=[["Dash","Dashboard"],["WO","Work Orders"],["Assets","Assets"],["Parts","Spare Parts"],["PM","PM Plans"],["AI","AI Analysis"]];var h="<div class=\"sbt\">Navigation</div>";items.forEach(function(i){h+="<div class=\"ni\" id=\"nav"+i[0]+"\" onclick=\"navTo('"+i[0]+"')\">" +i[1]+"</div>";});document.getElementById("sb").innerHTML=h;}
-function navTo(p){document.querySelectorAll(".page").forEach(function(x){x.classList.remove("active");});document.querySelectorAll(".ni").forEach(function(x){x.classList.remove("active");});var pg=document.getElementById("p"+p);if(pg)pg.classList.add("active");var nav=document.getElementById("nav"+p);if(nav)nav.classList.add("active");if(p==="Dash")loadDash();if(p==="WO")loadWO();if(p==="Assets")loadAssets();if(p==="Parts")loadParts();if(p==="PM")loadPM();if(p==="AI")loadAIPage();}
-function api(path,opts){var o=opts||{};o.headers=o.headers||{};o.headers["Authorization"]="Bearer "+T;o.headers["Content-Type"]="application/json";return fetch(path,o).then(function(r){return r.json();});}
-function sb(s){var m={open:"b-open",in_progress:"b-inp",completed:"b-done",overdue:"b-over"};return "<span class=\"badge "+(m[s]||"b-open")+"\">"+s+"</span>";}
-function pb(p){var m={critical:"b-crit",high:"b-high",medium:"b-med",low:"b-low"};return "<span class=\"badge "+(m[p]||"b-med")+"\">"+p+"</span>";}
-function hc(v){if(v>=80)return "qty-ok";if(v>=50)return "amber";return "qty-low";}
-function loadDash(){api("/api/kpi/summary").then(function(k){var s=k.summary||k;var h="<div class=\"phdr\"><div class=\"ptitle\">Dashboard</div></div><div class=\"kgrid\">";h+="<div class=\"kcard\"><div class=\"kval\">"+s.total+"</div><div class=\"klbl\">Total WOs</div></div>";h+="<div class=\"kcard\"><div class=\"kval\">"+s.open+"</div><div class=\"klbl\">Open</div></div>";h+="<div class=\"kcard\"><div class=\"kval amber\">"+s.inprog+"</div><div class=\"klbl\">In Progress</div></div>";h+="<div class=\"kcard\"><div class=\"kval green\">"+s.completed+"</div><div class=\"klbl\">Completed</div></div>";h+="<div class=\"kcard\"><div class=\"kval red\">"+s.overdue+"</div><div class=\"klbl\">Overdue</div></div>";h+="<div class=\"kcard\"><div class=\"kval cyan\">"+s.assets+"</div><div class=\"klbl\">Assets</div></div>";h+="<div class=\"kcard\"><div class=\"kval amber\">"+(s.avgMttr||0)+"h</div><div class=\"klbl\">Avg MTTR</div></div>";h+="<div class=\"kcard\"><div class=\"kval red\">"+s.critical+"</div><div class=\"klbl\">Critical</div></div></div>";h+="<div class=\"twrap\" style=\"padding:16px\"><canvas id=\"kChart\" height=\"100\"></canvas></div>";document.getElementById("pDash").innerHTML=h;if(k.monthly&&k.monthly.length>0){new Chart(document.getElementById("kChart"),{type:"bar",data:{labels:k.monthly.map(function(m){return m.month;}),datasets:[{label:"Total",data:k.monthly.map(function(m){return m.total;}),backgroundColor:"rgba(77,159,255,.3)",borderColor:"#4d9fff",borderWidth:1},{label:"Completed",data:k.monthly.map(function(m){return m.completed;}),backgroundColor:"rgba(0,200,122,.3)",borderColor:"#00c87a",borderWidth:1}]},options:{responsive:true,plugins:{legend:{labels:{color:"#7a9cc8"}}},scales:{x:{ticks:{color:"#4a6888"}},y:{ticks:{color:"#4a6888"}}}}});}});}
-function loadWO(){api("/api/work-orders").then(function(wos){var w=Array.isArray(wos)?wos:[];var h="<div class=\"phdr\"><div class=\"ptitle\">Work Orders</div><button class=\"btn btn-p\" onclick=\"openNewWO()\">+ New WO</button></div><div class=\"twrap\"><table><thead><tr><th>WO#</th><th>Title</th><th>Asset</th><th>Priority</th><th>Status</th><th>Assigned</th></tr></thead><tbody>";w.forEach(function(i){h+="<tr><td class=\"code\">"+i.wo_number+"</td><td>"+i.title+"</td><td class=\"tx2\">"+(i.asset_name||"-")+"</td><td>"+pb(i.priority)+"</td><td>"+sb(i.status)+"</td><td>"+(i.assigned_to||"-")+"</td></tr>";});h+="</tbody></table></div>";document.getElementById("pWO").innerHTML=h;});}
-function loadAssets(){api("/api/assets").then(function(list){var a=Array.isArray(list)?list:[];var h="<div class=\"phdr\"><div class=\"ptitle\">Assets</div></div><div class=\"twrap\"><table><thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Location</th><th>Status</th><th>Health</th></tr></thead><tbody>";a.forEach(function(i){var sc=i.status==="active"?"b-act":"b-over";h+="<tr><td class=\"cyan\">"+i.code+"</td><td>"+i.name+"</td><td class=\"tx2\">"+i.type+"</td><td>"+(i.location||"-")+"</td><td><span class=\"badge "+sc+"\">"+i.status+"</span></td><td class=\""+hc(i.health_score)+"\">"+i.health_score+"%</td></tr>";});h+="</tbody></table></div>";document.getElementById("pAssets").innerHTML=h;});}
-function loadParts(){api("/api/spare-parts").then(function(d){var p=d.parts||[];var h="<div class=\"phdr\"><div class=\"ptitle\">Spare Parts</div><div class=\"tx3\">Low Stock: "+(d.low_stock_count||0)+"</div></div><div class=\"twrap\"><table><thead><tr><th>Part No</th><th>Name</th><th>Category</th><th>Qty</th><th>Min</th><th>Location</th></tr></thead><tbody>";p.forEach(function(i){var qc=i.quantity<=i.min_qty?"qty-low":"qty-ok";h+="<tr><td class=\"cyan\">"+(i.part_no||"-")+"</td><td>"+i.name+"</td><td class=\"tx2\">"+(i.category||"-")+"</td><td class=\""+qc+"\">"+i.quantity+"</td><td class=\"tx3\">"+i.min_qty+"</td><td>"+(i.location||"-")+"</td></tr>";});h+="</tbody></table></div>";document.getElementById("pParts").innerHTML=h;});}
-function loadPM(){api("/api/pm-plans").then(function(plans){var p=Array.isArray(plans)?plans:[];var h="<div class=\"phdr\"><div class=\"ptitle\">PM Plans</div></div>";if(p.length===0){h+="<div class=\"nodata\">No PM plans yet</div>";}else{h+="<div class=\"twrap\"><table><thead><tr><th>Title</th><th>Asset</th><th>Frequency</th><th>Last Done</th><th>Next Due</th></tr></thead><tbody>";p.forEach(function(i){h+="<tr><td>"+i.title+"</td><td>"+(i.asset_name||"-")+"</td><td>"+i.frequency_days+" days</td><td>"+(i.last_done||"-")+"</td><td class=\"amber\">"+(i.next_due||"-")+"</td></tr>";});h+="</tbody></table></div>";}document.getElementById("pPM").innerHTML=h;});}
-function openNewWO(){api("/api/assets").then(function(list){var a=Array.isArray(list)?list:[];var sel=document.getElementById("wa");var o="<option value=\"\">-- Select Asset --</option>";a.forEach(function(i){o+="<option value=\""+i.id+"\">"+i.code+" - "+i.name+"</option>";});sel.innerHTML=o;document.getElementById("wt").value="";document.getElementById("wd").value="";document.getElementById("wass").value="";document.getElementById("wsla").value="4";openModal("woModal");});}
-function submitWO(){var b={title:document.getElementById("wt").value,asset_id:document.getElementById("wa").value||null,type:document.getElementById("wty").value,priority:document.getElementById("wp").value,assigned_to:document.getElementById("wass").value,sla_hours:parseInt(document.getElementById("wsla").value)||4,description:document.getElementById("wd").value};if(!b.title)return toast("Title required","err");api("/api/work-orders",{method:"POST",body:JSON.stringify(b)}).then(function(r){if(r.wo_number){toast("Created: "+r.wo_number,"ok");closeModal("woModal");loadWO();navTo("WO");}else toast(r.error||"Error","err");});}
-function submitPub(){var b={title:document.getElementById("pt").value,requester_name:document.getElementById("pn").value,requester_contact:document.getElementById("pc").value,description:document.getElementById("pd").value};if(!b.title)return toast("Please enter title","err");fetch("/api/work-orders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}).then(function(r){return r.json();}).then(function(d){if(d.wo_number){toast("Submitted: "+d.wo_number,"ok");closeModal("pubModal");}else toast(d.error||"Error","err");});}
-function openModal(id){document.getElementById(id).classList.add("active");}
-function closeModal(id){document.getElementById(id).classList.remove("active");}
-function toast(msg,type){var t=document.getElementById("toast");t.textContent=msg;t.className="toast show "+(type||"ok");setTimeout(function(){t.classList.remove("show");},3000);}
-</script></body></html>
+// ========== STATE ==========
+var T='',R='',UN='',CR='admin';
+var _wos=[],_assets=[],_parts=[],_pms=[];
+var _curWoId=null;
+
+// ========== INIT ==========
+(function(){
+  T=localStorage.getItem('ct')||'';
+  R=localStorage.getItem('cr')||'';
+  UN=localStorage.getItem('cn')||'';
+  if(T){showApp();navTo('Dash');}else{showLogin();}
+})();
+
+// ========== AUTH ==========
+function setRole(r){
+  CR=r;
+  document.getElementById('tabAdmin').classList.toggle('active',r==='admin');
+  document.getElementById('tabTech').classList.toggle('active',r==='tech');
+}
+function doLogin(){
+  var pin=document.getElementById('pinIn').value.trim();
+  if(!pin){showErr('Please enter PIN');return;}
+  hideErr();
+  fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({role:CR,pin:pin})})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(d.token){
+      T=d.token;R=d.role;UN=d.name;
+      localStorage.setItem('ct',T);localStorage.setItem('cr',R);localStorage.setItem('cn',UN);
+      document.getElementById('pinIn').value='';
+      showApp();navTo('Dash');
+    }else showErr(d.error||'Login failed — check your PIN');
+  }).catch(function(){showErr('Connection error');});
+}
+function showErr(m){var e=document.getElementById('lerr');e.textContent=m;e.classList.add('show');}
+function hideErr(){var e=document.getElementById('lerr');e.textContent='';e.classList.remove('show');}
+function logout(){
+  T='';R='';UN='';
+  localStorage.removeItem('ct');localStorage.removeItem('cr');localStorage.removeItem('cn');
+  showLogin();
+}
+function showLogin(){document.getElementById('loginPage').style.display='flex';document.getElementById('appPage').style.display='none';}
+function showApp(){
+  document.getElementById('loginPage').style.display='none';
+  document.getElementById('appPage').style.display='flex';
+  document.getElementById('uchip').querySelector('span').textContent=UN;
+  document.getElementById('roleLabel').textContent=R.toUpperCase();
+  renderSB();
+  setInterval(function(){
+    document.getElementById('clk').textContent=new Date().toLocaleTimeString('th-TH',{timeZone:'Asia/Bangkok'});
+  },1000);
+}
+
+// ========== SIDEBAR ==========
+function renderSB(){
+  var items=[
+    {id:'Dash',icon:'📊',label:'Dashboard'},
+    {id:'WO',icon:'📋',label:'Work Orders'},
+    {id:'Assets',icon:'⚙️',label:'Assets'},
+    {id:'Parts',icon:'🔩',label:'Spare Parts'},
+    {id:'PM',icon:'📅',label:'PM Plans'},
+    {id:'AI',icon:'🤖',label:'AI Analysis'},
+  ];
+  var h='<div class="nsec">Main Menu</div>';
+  items.forEach(function(i){
+    h+='<div class="ni" id="nav'+i.id+'" onclick="navTo(\''+i.id+'\')"><span class="ni-icon">'+i.icon+'</span>'+i.label+'</div>';
+  });
+  document.getElementById('sb').innerHTML='<div class="sb-logo">Navigation</div>'+h;
+}
+function navTo(p){
+  document.querySelectorAll('.page').forEach(function(x){x.classList.remove('active');});
+  document.querySelectorAll('.ni').forEach(function(x){x.classList.remove('active');});
+  var pg=document.getElementById('p'+p);if(pg)pg.classList.add('active');
+  var nav=document.getElementById('nav'+p);if(nav)nav.classList.add('active');
+  if(p==='Dash')loadDash();
+  if(p==='WO')loadWO();
+  if(p==='Assets')loadAssets();
+  if(p==='Parts')loadParts();
+  if(p==='PM')loadPM();
+  if(p==='AI')loadAIPage();
+}
+
+// ========== API HELPER ==========
+function api(path,opts){
+  var o=opts||{};
+  o.headers=Object.assign({'Authorization':'Bearer '+T,'Content-Type':'application/json'},o.headers||{});
+  return fetch(path,o).then(function(r){
+    if(r.status===401){logout();return {};}
+    return r.json();
+  });
+}
+
+// ========== BADGE HELPERS ==========
+function sbadge(s){
+  var m={open:'bs-open',in_progress:'bs-inp',completed:'bs-done',overdue:'bs-over',cancelled:'bp-low'};
+  var labels={open:'Open',in_progress:'In Progress',completed:'Completed',overdue:'Overdue',cancelled:'Cancelled'};
+  return '<span class="badge '+(m[s]||'bp-low')+'">'+(labels[s]||s)+'</span>';
+}
+function pbadge(p){
+  var m={critical:'bp-crit',high:'bp-high',medium:'bp-med',low:'bp-low'};
+  var icons={critical:'🔴',high:'🟡',medium:'🔵',low:'🟢'};
+  return '<span class="badge '+(m[p]||'bp-med')+'">'+(icons[p]||'')+(p||'-')+'</span>';
+}
+function hcolor(v){if(v>=80)return 'qty-ok';if(v>=50)return 'famber';return 'qty-low';}
+function hbar(v){
+  var c=v>=80?'var(--green)':v>=50?'var(--amber)':'var(--red)';
+  return '<div class="hbar-wrap"><div class="hbar"><div class="hbar-fill" style="width:'+v+'%;background:'+c+'"></div></div><span class="hbar-num '+hcolor(v)+'">'+v+'%</span></div>';
+}
+
+// ========== DASHBOARD ==========
+function loadDash(){
+  api('/api/kpi/summary').then(function(k){
+    var s=k.summary||k||{};
+    var monthly=k.monthly||[];
+    var byPri=k.byPriority||[];
+    var byType=k.byType||[];
+    var h='<div class="phdr"><div class="ptitle">📊 Dashboard <small>Real-time Overview</small></div>';
+    h+='<div class="pactions"><button class="btn btn-ai" onclick="quickAIDash()">🤖 AI Insight</button>';
+    h+='<button class="btn btn-secondary btn-sm" onclick="loadDash()">🔄 Refresh</button></div></div>';
+    
+    // KPI Cards
+    h+='<div class="kgrid">';
+    h+=kcard('Total WOs',(s.total||0),'var(--blue)','📋');
+    h+=kcard('Open',(s.open||0),'var(--blue)','📬');
+    h+=kcard('In Progress',(s.inprog||0),'var(--amber)','🔧');
+    h+=kcard('Completed',(s.completed||0),'var(--green)','✅');
+    h+=kcard('Overdue',(s.overdue||0),'var(--red)','⚠️');
+    h+=kcard('Active Assets',(s.assets||0),'var(--cyan)','⚙️');
+    h+=kcard('Avg MTTR',(s.avgMttr||0)+'h','var(--purple)','⏱️');
+    h+=kcard('Critical Open',(s.critical||0),'var(--red)','🚨');
+    h+='</div>';
+    
+    // Charts
+    h+='<div class="chart-grid">';
+    h+='<div class="chart-box"><div class="chart-title">📈 Monthly Trend</div><canvas id="chartMonthly" height="180"></canvas></div>';
+    h+='<div class="chart-box"><div class="chart-title">📊 By Priority</div><canvas id="chartPri" height="180"></canvas></div>';
+    h+='</div>';
+    
+    // AI Quick panel
+    h+='<div class="ai-panel" id="dashAiPanel" style="display:none">';
+    h+='<div class="ai-header"><span class="ai-icon">🤖</span><span class="ai-title">AI Dashboard Insight</span></div>';
+    h+='<div class="ai-content" id="dashAiContent"><div class="ai-loading"><div class="ai-dots"><span></span><span></span><span></span></div> Generating insight...</div></div>';
+    h+='</div>';
+    
+    document.getElementById('pDash').innerHTML=h;
+    
+    // Monthly Chart
+    if(monthly.length>0){
+      new Chart(document.getElementById('chartMonthly'),{
+        type:'bar',
+        data:{
+          labels:monthly.map(function(m){return m.month;}),
+          datasets:[
+            {label:'Total',data:monthly.map(function(m){return m.total;}),backgroundColor:'rgba(61,143,255,.3)',borderColor:'#3d8fff',borderWidth:2,borderRadius:4},
+            {label:'Completed',data:monthly.map(function(m){return m.completed;}),backgroundColor:'rgba(0,212,116,.3)',borderColor:'#00d474',borderWidth:2,borderRadius:4}
+          ]
+        },
+        options:{responsive:true,plugins:{legend:{labels:{color:'#7a9fc8',font:{size:11}}}},
+          scales:{x:{ticks:{color:'#4a6080'},grid:{color:'rgba(50,80,160,.15)'}},
+                  y:{ticks:{color:'#4a6080'},grid:{color:'rgba(50,80,160,.15)'}}}}
+      });
+    }
+    
+    // Priority Chart
+    if(byPri.length>0){
+      var priColors={critical:'rgba(255,64,96,.7)',high:'rgba(255,193,7,.7)',medium:'rgba(61,143,255,.7)',low:'rgba(74,96,128,.5)'};
+      new Chart(document.getElementById('chartPri'),{
+        type:'doughnut',
+        data:{
+          labels:byPri.map(function(p){return p.priority;}),
+          datasets:[{data:byPri.map(function(p){return p.n;}),
+            backgroundColor:byPri.map(function(p){return priColors[p.priority]||'rgba(100,100,100,.5)';}),
+            borderWidth:2,borderColor:getComputedStyle(document.documentElement).getPropertyValue('--bg2').trim()}]
+        },
+        options:{responsive:true,plugins:{legend:{labels:{color:'#7a9fc8',font:{size:11}}}}}
+      });
+    }
+  });
+}
+function kcard(label,val,color,icon){
+  return '<div class="kcard" style="--card-color:'+color+'"><div class="kval">'+icon+' '+val+'</div><div class="klbl">'+label+'</div></div>';
+}
+function quickAIDash(){
+  var panel=document.getElementById('dashAiPanel');
+  panel.style.display='block';
+  api('/api/kpi/summary').then(function(k){
+    var s=k.summary||k||{};
+    var ctx='Dashboard KPIs: Total WOs='+s.total+', Open='+s.open+', InProgress='+s.inprog+', Completed='+s.completed+', Overdue='+s.overdue+', Critical='+s.critical+', Assets='+s.assets+', AvgMTTR='+s.avgMttr+'h';
+    callAI('You are a CMMS maintenance expert. Analyze this dashboard data and provide: 1) Overall system health assessment 2) Top 3 concerns 3) Recommended immediate actions. Be concise and practical.\n\n'+ctx, 'dashAiContent');
+  });
+}
+
+// ========== WORK ORDERS ==========
+function loadWO(){
+  api('/api/work-orders').then(function(wos){
+    _wos=Array.isArray(wos)?wos:[];
+    var h='<div class="phdr"><div class="ptitle">📋 Work Orders <small>'+_wos.length+' total</small></div>';
+    h+='<div class="pactions">';
+    if(R==='admin'||R==='tech')h+='<button class="btn btn-primary" onclick="openNewWO()">➕ New WO</button>';
+    h+='<button class="btn btn-ai" onclick="aiAnalyzeWOs()">🤖 AI Analysis</button>';
+    h+='<button class="btn btn-secondary btn-sm" onclick="loadWO()">🔄</button>';
+    h+='</div></div>';
+    
+    if(_wos.length===0){
+      h+='<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">No work orders yet<br><small>Create your first work order to get started</small></div></div>';
+      document.getElementById('pWO').innerHTML=h;return;
+    }
+    
+    h+='<div class="twrap"><div class="tbar">';
+    h+='<input type="text" class="tsearch" id="woSearch" placeholder="🔍 Search work orders..." oninput="filterWOs()">';
+    h+='<select class="fi" style="width:auto;padding:7px 12px" id="woFilter" onchange="filterWOs()">';
+    h+='<option value="">All Status</option><option value="open">Open</option><option value="in_progress">In Progress</option><option value="completed">Completed</option><option value="overdue">Overdue</option></select>';
+    h+='</div>';
+    h+='<table><thead><tr><th>WO#</th><th>Title</th><th>Asset</th><th>Priority</th><th>Status</th><th>Assigned</th><th>SLA</th><th>Actions</th></tr></thead>';
+    h+='<tbody id="woTbody">';
+    h+=renderWORows(_wos);
+    h+='</tbody></table>';
+    h+='<div class="tfoot"><span>'+_wos.length+' work orders</span><span style="color:var(--tx3);font-size:11px">Click row for details</span></div>';
+    h+='</div>';
+    
+    document.getElementById('pWO').innerHTML=h;
+  });
+}
+function renderWORows(wos){
+  var h='';
+  wos.forEach(function(w){
+    var sla=w.sla_deadline?w.sla_deadline.substring(0,16):'-';
+    var overSLA=w.sla_deadline&&new Date(w.sla_deadline)<new Date()&&w.status!=='completed'?'fred':'';
+    h+='<tr onclick="showWODetail('+w.id+')" style="cursor:pointer">';
+    h+='<td class="tcode">'+w.wo_number+'</td>';
+    h+='<td><strong>'+w.title+'</strong>'+(w.description?'<br><small style="color:var(--tx3)">'+w.description.substring(0,50)+(w.description.length>50?'...':'')+'</small>':'')+'</td>';
+    h+='<td class="tx2">'+(w.asset_name||'-')+'</td>';
+    h+='<td>'+pbadge(w.priority)+'</td>';
+    h+='<td>'+sbadge(w.status)+'</td>';
+    h+='<td>'+(w.assigned_to||'<span style="color:var(--tx3)">Unassigned</span>')+'</td>';
+    h+='<td class="'+overSLA+'">'+sla+(overSLA?' ⚠️':'')+'</td>';
+    h+='<td><div onclick="event.stopPropagation()" style="display:flex;gap:4px">';
+    if(R==='admin'||R==='tech'){
+      h+='<button class="btn btn-sm" style="background:rgba(61,143,255,.15);color:var(--blue);border:1px solid rgba(61,143,255,.3);padding:4px 8px;font-size:11px" onclick="openStatusModal('+w.id+')">Update</button>';
+    }
+    h+='<button class="btn btn-sm btn-ai" style="padding:4px 8px;font-size:11px" onclick="aiWO('+w.id+')">🤖</button>';
+    h+='</div></td></tr>';
+  });
+  return h;
+}
+function filterWOs(){
+  var q=(document.getElementById('woSearch')||{}).value||'';
+  var f=(document.getElementById('woFilter')||{}).value||'';
+  q=q.toLowerCase();
+  var filtered=_wos.filter(function(w){
+    var match=!q||(w.wo_number.toLowerCase().indexOf(q)>-1||w.title.toLowerCase().indexOf(q)>-1||(w.assigned_to||'').toLowerCase().indexOf(q)>-1||(w.asset_name||'').toLowerCase().indexOf(q)>-1);
+    var statusMatch=!f||w.status===f;
+    return match&&statusMatch;
+  });
+  var tb=document.getElementById('woTbody');
+  if(tb)tb.innerHTML=renderWORows(filtered);
+}
+function showWODetail(id){
+  var w=_wos.find(function(x){return x.id===id;});
+  if(!w)return;
+  _curWoId=id;
+  var h='<div class="detail-grid">';
+  h+='<div class="dfield"><label>WO Number</label><div class="dval tcode">'+w.wo_number+'</div></div>';
+  h+='<div class="dfield"><label>Status</label><div class="dval">'+sbadge(w.status)+'</div></div>';
+  h+='<div class="dfield"><label>Priority</label><div class="dval">'+pbadge(w.priority)+'</div></div>';
+  h+='<div class="dfield"><label>Type</label><div class="dval">'+w.type+'</div></div>';
+  h+='<div class="dfield"><label>Asset</label><div class="dval tcyan">'+(w.asset_name||'-')+'</div></div>';
+  h+='<div class="dfield"><label>Assigned To</label><div class="dval">'+(w.assigned_to||'Unassigned')+'</div></div>';
+  h+='<div class="dfield"><label>SLA Deadline</label><div class="dval">'+(w.sla_deadline||'-')+'</div></div>';
+  h+='<div class="dfield"><label>Created</label><div class="dval">'+(w.created_at||'-')+'</div></div>';
+  h+='</div>';
+  if(w.description)h+='<div class="fg"><div class="fl">Description</div><div style="background:var(--bg3);border-radius:8px;padding:12px;font-size:13px;color:var(--tx2)">'+w.description+'</div></div>';
+  if(w.root_cause)h+='<div class="fg"><div class="fl">Root Cause</div><div style="background:var(--bg3);border-radius:8px;padding:12px;font-size:13px;color:var(--tx2)">'+w.root_cause+'</div></div>';
+  if(w.labor_hours)h+='<div class="fg"><div class="fl">Labor Hours</div><div style="font-size:24px;font-weight:700;color:var(--amber)">'+w.labor_hours+'h</div></div>';
+  
+  // AI Analysis for this WO
+  h+='<div class="ai-panel"><div class="ai-header"><span class="ai-icon">🤖</span><span class="ai-title">AI Analysis for this WO</span>';
+  h+='<button class="btn btn-ai btn-sm" onclick="aiWO('+id+')" style="margin-left:auto">Analyze</button></div>';
+  h+='<div class="ai-content" id="woAiDetail">Click "Analyze" for AI insights on this work order.</div></div>';
+  
+  document.getElementById('woDetailTitle').textContent='📋 '+w.wo_number+': '+w.title;
+  document.getElementById('woDetailBody').innerHTML=h;
+  openModal('woDetailModal');
+}
+function openNewWO(){
+  api('/api/assets').then(function(list){
+    _assets=Array.isArray(list)?list:[];
+    var sel=document.getElementById('wa');
+    var o='<option value="">-- No specific asset --</option>';
+    _assets.forEach(function(a){o+='<option value="'+a.id+'">'+a.code+' - '+a.name+'</option>';});
+    sel.innerHTML=o;
+    document.getElementById('wt').value='';
+    document.getElementById('wd').value='';
+    document.getElementById('wass').value='';
+    document.getElementById('wsla').value='4';
+    document.getElementById('woModalTitle').textContent='📋 Create Work Order';
+    openModal('woModal');
+  });
+}
+function submitWO(){
+  var b={
+    title:document.getElementById('wt').value.trim(),
+    asset_id:document.getElementById('wa').value||null,
+    type:document.getElementById('wty').value,
+    priority:document.getElementById('wp').value,
+    assigned_to:document.getElementById('wass').value.trim(),
+    sla_hours:parseInt(document.getElementById('wsla').value)||4,
+    description:document.getElementById('wd').value.trim()
+  };
+  if(!b.title){toast('Title is required','err');return;}
+  api('/api/work-orders',{method:'POST',body:JSON.stringify(b)}).then(function(r){
+    if(r.wo_number){
+      toast('✅ Work Order '+r.wo_number+' created!','ok');
+      closeModal('woModal');
+      loadWO();navTo('WO');
+    }else toast(r.error||'Error creating WO','err');
+  });
+}
+function openStatusModal(id){
+  _curWoId=id;
+  var w=_wos.find(function(x){return x.id===id;});
+  if(w){
+    document.getElementById('newStatus').value=w.status;
+    document.getElementById('rootCause').value=w.root_cause||'';
+    document.getElementById('laborHours').value=w.labor_hours||'';
+    document.getElementById('partsUsed').value=w.parts_used||'';
+    document.getElementById('statusNotes').value=w.notes||'';
+  }
+  document.getElementById('statusWoId').value=id;
+  openModal('statusModal');
+}
+function submitStatus(){
+  var id=document.getElementById('statusWoId').value;
+  var b={
+    status:document.getElementById('newStatus').value,
+    root_cause:document.getElementById('rootCause').value,
+    labor_hours:parseFloat(document.getElementById('laborHours').value)||null,
+    parts_used:document.getElementById('partsUsed').value,
+    notes:document.getElementById('statusNotes').value
+  };
+  api('/api/work-orders/'+id+'/status',{method:'PATCH',body:JSON.stringify(b)}).then(function(r){
+    if(r.success){
+      toast('✅ Status updated to: '+b.status,'ok');
+      closeModal('statusModal');
+      loadWO();
+    }else toast(r.error||'Update failed','err');
+  });
+}
+function updateWOStatus(){openStatusModal(_curWoId);}
+
+// ========== ASSETS ==========
+function loadAssets(){
+  api('/api/assets').then(function(list){
+    _assets=Array.isArray(list)?list:[];
+    var h='<div class="phdr"><div class="ptitle">⚙️ Assets <small>'+_assets.length+' registered</small></div>';
+    h+='<div class="pactions">';
+    if(R==='admin')h+='<button class="btn btn-primary" onclick="openModal(\'assetModal\')">➕ Add Asset</button>';
+    h+='<button class="btn btn-ai" onclick="aiAnalyzeAssets()">🤖 AI Health Check</button>';
+    h+='</div></div>';
+    
+    if(_assets.length===0){
+      h+='<div class="empty"><div class="empty-icon">⚙️</div><div class="empty-text">No assets registered</div></div>';
+      document.getElementById('pAssets').innerHTML=h;return;
+    }
+    
+    h+='<div class="twrap"><div class="tbar"><input type="text" class="tsearch" placeholder="🔍 Search assets..." oninput="filterAssets(this.value)"></div>';
+    h+='<table><thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Location</th><th>Status</th><th>Health Score</th><th>WOs</th></tr></thead>';
+    h+='<tbody id="assetTbody">'+renderAssetRows(_assets)+'</tbody></table>';
+    h+='<div class="tfoot"><span>'+_assets.length+' assets</span></div></div>';
+    
+    document.getElementById('pAssets').innerHTML=h;
+  });
+}
+function renderAssetRows(assets){
+  var h='';
+  assets.forEach(function(a){
+    h+='<tr>';
+    h+='<td class="tcyan">'+a.code+'</td>';
+    h+='<td><strong>'+a.name+'</strong>'+(a.manufacturer?'<br><small style="color:var(--tx3)">'+a.manufacturer+(a.model?' / '+a.model:'')+'</small>':'')+'</td>';
+    h+='<td class="tx2">'+a.type+'</td>';
+    h+='<td>'+(a.location||'-')+'</td>';
+    h+='<td><span class="badge '+(a.status==='active'?'bs-act':'bs-inact')+'">'+a.status+'</span></td>';
+    h+='<td>'+hbar(a.health_score||100)+'</td>';
+    h+='<td><button class="btn btn-sm btn-ai" onclick="aiAsset('+a.id+',\''+a.code+'\',\''+a.name+'\')">🤖 Analyze</button></td>';
+    h+='</tr>';
+  });
+  return h;
+}
+function filterAssets(q){
+  q=q.toLowerCase();
+  var f=_assets.filter(function(a){return !q||(a.code.toLowerCase().indexOf(q)>-1||a.name.toLowerCase().indexOf(q)>-1||(a.location||'').toLowerCase().indexOf(q)>-1);});
+  var tb=document.getElementById('assetTbody');
+  if(tb)tb.innerHTML=renderAssetRows(f);
+}
+function submitAsset(){
+  var b={
+    code:document.getElementById('aCode').value.trim(),
+    name:document.getElementById('aName').value.trim(),
+    type:document.getElementById('aType').value,
+    location:document.getElementById('aLoc').value.trim(),
+    manufacturer:document.getElementById('aMfr').value.trim(),
+    model:document.getElementById('aModel').value.trim(),
+    serial_no:document.getElementById('aSn').value.trim(),
+    install_date:document.getElementById('aInstall').value||null,
+    notes:document.getElementById('aNotes').value.trim()
+  };
+  if(!b.code||!b.name){toast('Code and Name are required','err');return;}
+  api('/api/assets',{method:'POST',body:JSON.stringify(b)}).then(function(r){
+    if(r.id){
+      toast('✅ Asset '+b.code+' added!','ok');
+      closeModal('assetModal');loadAssets();
+    }else toast(r.error||'Error adding asset','err');
+  });
+}
+
+// ========== SPARE PARTS ==========
+function loadParts(){
+  api('/api/spare-parts').then(function(d){
+    _parts=(d.parts||[]);
+    var lowCount=d.low_stock_count||0;
+    var h='<div class="phdr"><div class="ptitle">🔩 Spare Parts <small>'+_parts.length+' items</small></div>';
+    h+='<div class="pactions">';
+    if(lowCount>0)h+='<span class="badge bp-crit">⚠️ '+lowCount+' Low Stock</span>';
+    h+='<button class="btn btn-ai" onclick="aiAnalyzeParts()">🤖 Stock Analysis</button>';
+    h+='</div></div>';
+    
+    if(_parts.length===0){
+      h+='<div class="empty"><div class="empty-icon">🔩</div><div class="empty-text">No spare parts registered</div></div>';
+      document.getElementById('pParts').innerHTML=h;return;
+    }
+    
+    h+='<div class="twrap"><table><thead><tr><th>Part No.</th><th>Name</th><th>Category</th><th>Qty</th><th>Min Qty</th><th>Unit Cost</th><th>Location</th><th>Supplier</th></tr></thead><tbody>';
+    _parts.forEach(function(p){
+      var qc=p.quantity<=p.min_qty?'qty-low':'qty-ok';
+      var alert=p.quantity<=p.min_qty?'<span class="badge bp-crit" style="font-size:10px">⚠️ Low</span>':'';
+      h+='<tr>';
+      h+='<td class="tcyan">'+(p.part_no||'-')+'</td>';
+      h+='<td><strong>'+p.name+'</strong> '+alert+'</td>';
+      h+='<td class="tx2">'+(p.category||'-')+'</td>';
+      h+='<td class="'+qc+'">'+p.quantity+'</td>';
+      h+='<td class="tx3">'+p.min_qty+'</td>';
+      h+='<td>'+(p.unit_cost?'฿'+p.unit_cost.toLocaleString():'-')+'</td>';
+      h+='<td>'+(p.location||'-')+'</td>';
+      h+='<td class="tx2">'+(p.supplier||'-')+'</td>';
+      h+='</tr>';
+    });
+    h+='</tbody></table><div class="tfoot"><span>'+_parts.length+' parts | '+lowCount+' low stock</span></div></div>';
+    document.getElementById('pParts').innerHTML=h;
+  });
+}
+
+// ========== PM PLANS ==========
+function loadPM(){
+  api('/api/pm-plans').then(function(plans){
+    _pms=Array.isArray(plans)?plans:[];
+    var h='<div class="phdr"><div class="ptitle">📅 PM Plans <small>'+_pms.length+' plans</small></div>';
+    h+='<div class="pactions"><button class="btn btn-ai" onclick="aiAnalyzePM()">🤖 PM Analysis</button></div></div>';
+    
+    if(_pms.length===0){
+      h+='<div class="empty"><div class="empty-icon">📅</div><div class="empty-text">No PM plans configured<br><small>Create preventive maintenance plans to reduce breakdowns</small></div></div>';
+      document.getElementById('pPM').innerHTML=h;return;
+    }
+    
+    var now=new Date();
+    h+='<div class="twrap"><table><thead><tr><th>Title</th><th>Asset</th><th>Frequency</th><th>Last Done</th><th>Next Due</th><th>Status</th></tr></thead><tbody>';
+    _pms.forEach(function(p){
+      var due=p.next_due?new Date(p.next_due):null;
+      var isOverdue=due&&due<now;
+      var isDueSoon=due&&!isOverdue&&(due-now)<7*86400000;
+      var dueClass=isOverdue?'fred':isDueSoon?'famber':'';
+      var dueIcon=isOverdue?'⚠️ ':isDueSoon?'🔔 ':'';
+      h+='<tr>';
+      h+='<td><strong>'+p.title+'</strong>'+(p.description?'<br><small style="color:var(--tx3)">'+p.description.substring(0,50)+'</small>':'')+'</td>';
+      h+='<td class="tcyan">'+(p.asset_name||'-')+'</td>';
+      h+='<td class="tx2">Every '+p.frequency_days+' days</td>';
+      h+='<td class="tx3">'+(p.last_done||'Never')+'</td>';
+      h+='<td class="'+dueClass+'">'+dueIcon+(p.next_due||'Not scheduled')+'</td>';
+      h+='<td>'+(isOverdue?'<span class="badge bs-over">Overdue</span>':isDueSoon?'<span class="badge bs-inp">Due Soon</span>':'<span class="badge bs-act">On Track</span>')+'</td>';
+      h+='</tr>';
+    });
+    h+='</tbody></table><div class="tfoot"><span>'+_pms.length+' maintenance plans</span></div></div>';
+    document.getElementById('pPM').innerHTML=h;
+  });
+}
+
+// ========== AI PAGE ==========
+function loadAIPage(){
+  var h='<div class="phdr"><div class="ptitle">🤖 AI Analysis Center <small>Powered by Claude AI</small></div></div>';
+  
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:22px">';
+  
+  // Quick Analysis Cards
+  var cards=[
+    {icon:'📊',title:'Dashboard Analysis',desc:'Overall system health & recommendations',fn:'quickAIDash'},
+    {icon:'⚙️',title:'Asset Health Check',desc:'Analyze all equipment health scores',fn:'aiAnalyzeAssets'},
+    {icon:'📋',title:'Work Order Trends',desc:'WO patterns & efficiency insights',fn:'aiAnalyzeWOs'},
+    {icon:'🔩',title:'Inventory Analysis',desc:'Stock levels & procurement recommendations',fn:'aiAnalyzeParts'},
+    {icon:'📅',title:'PM Schedule Review',desc:'Preventive maintenance effectiveness',fn:'aiAnalyzePM'},
+    {icon:'🎯',title:'Maintenance Strategy',desc:'Long-term maintenance optimization plan',fn:'aiStrategy'},
+  ];
+  
+  cards.forEach(function(c){
+    h+='<div class="ai-card" onclick="'+c.fn+'()" style="cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor=\'rgba(157,111,255,.5)\'" onmouseout="this.style.borderColor=\'\'">';
+    h+='<div style="font-size:28px;margin-bottom:10px">'+c.icon+'</div>';
+    h+='<div style="font-size:14px;font-weight:700;color:var(--tx);margin-bottom:6px">'+c.title+'</div>';
+    h+='<div style="font-size:12px;color:var(--tx3);margin-bottom:12px">'+c.desc+'</div>';
+    h+='<button class="btn btn-ai btn-sm">🤖 Analyze Now</button>';
+    h+='</div>';
+  });
+  h+='</div>';
+  
+  // AI Chat Section
+  h+='<div class="ai-panel">';
+  h+='<div class="ai-header"><span class="ai-icon">💬</span><span class="ai-title">Ask AI About Your Maintenance</span></div>';
+  h+='<div style="display:flex;gap:10px;margin-bottom:12px">';
+  h+='<input type="text" class="fi" id="aiQuestion" placeholder="e.g. Which equipment needs immediate attention? What caused the most downtime?" style="flex:1" onkeydown="if(event.key===\'Enter\')askAI()">';
+  h+='<button class="btn btn-ai" onclick="askAI()">Ask AI</button>';
+  h+='</div>';
+  h+='<div class="ai-content" id="aiChatResult">Ask any question about your maintenance operations and get AI-powered insights.</div>';
+  h+='</div>';
+  
+  document.getElementById('pAI').innerHTML=h;
+}
+function askAI(){
+  var q=document.getElementById('aiQuestion').value.trim();
+  if(!q){toast('Please enter a question','err');return;}
+  var el=document.getElementById('aiChatResult');
+  el.innerHTML='<div class="ai-loading"><div class="ai-dots"><span></span><span></span><span></span></div> Analyzing your question...</div>';
+  
+  // Gather context
+  Promise.all([api('/api/kpi/summary'),api('/api/work-orders'),api('/api/assets'),api('/api/spare-parts')]).then(function(results){
+    var kpi=results[0];var wos=results[1];var assets=results[2];var parts=results[3];
+    var s=kpi.summary||kpi||{};
+    var ctx='CMMS System Context:\n';
+    ctx+='KPIs: Total WOs='+s.total+', Open='+s.open+', InProgress='+s.inprog+', Completed='+s.completed+', Overdue='+s.overdue+', Critical='+s.critical+'\n';
+    ctx+='Assets: '+((Array.isArray(assets)?assets:[]).map(function(a){return a.code+'('+a.name+',health:'+a.health_score+'%)';}).join(', '))+'\n';
+    ctx+='Low Stock Parts: '+((parts.parts||[]).filter(function(p){return p.quantity<=p.min_qty;}).map(function(p){return p.name+'(qty:'+p.quantity+'/min:'+p.min_qty+')';}).join(', '))+'\n';
+    var wlist=Array.isArray(wos)?wos:[];
+    ctx+='Recent WOs: '+wlist.slice(0,5).map(function(w){return w.wo_number+'('+w.status+','+w.priority+')';}).join(', ');
+    callAI('You are an expert CMMS maintenance advisor. Answer this question based on the system data:\n\nQuestion: '+q+'\n\nSystem Data:\n'+ctx+'\n\nProvide actionable, specific advice.', 'aiChatResult');
+  });
+}
+
+// ========== AI ANALYSIS FUNCTIONS ==========
+function aiAnalyzeWOs(){
+  openModal('aiModal');
+  document.getElementById('aiModalBody').innerHTML='<div class="ai-loading"><div class="ai-dots"><span></span><span></span><span></span></div> Analyzing work orders...</div>';
+  api('/api/work-orders').then(function(wos){
+    api('/api/kpi/summary').then(function(k){
+      var wlist=Array.isArray(wos)?wos:[];
+      var s=k.summary||k||{};
+      var ctx='Work Order Analysis Request:\n';
+      ctx+='Total: '+s.total+', Open: '+s.open+', InProgress: '+s.inprog+', Completed: '+s.completed+', Overdue: '+s.overdue+', Critical: '+s.critical+'\n';
+      ctx+='Recent WOs:\n'+wlist.slice(0,10).map(function(w){
+        return '- '+w.wo_number+': '+w.title+' | Status: '+w.status+' | Priority: '+w.priority+' | Asset: '+(w.asset_name||'N/A')+(w.labor_hours?' | Labor: '+w.labor_hours+'h':'');
+      }).join('\n');
+      callAI('As a CMMS expert, analyze these work orders and provide:\n1. Efficiency assessment\n2. Patterns and recurring issues\n3. Priority recommendations\n4. Staff workload insights\n5. Specific improvement actions\n\n'+ctx, 'aiModalBody');
+    });
+  });
+}
+function aiAnalyzeAssets(){
+  openModal('aiModal');
+  document.getElementById('aiModalBody').innerHTML='<div class="ai-loading"><div class="ai-dots"><span></span><span></span><span></span></div> Analyzing assets...</div>';
+  api('/api/assets').then(function(list){
+    api('/api/kpi/assets').then(function(kpias){
+      var alist=Array.isArray(list)?list:[];
+      var kaList=Array.isArray(kpias)?kpias:[];
+      var ctx='Asset Health Analysis:\n';
+      alist.forEach(function(a){
+        var ka=kaList.find(function(x){return x.id===a.id;})||{};
+        ctx+='- '+a.code+' ('+a.name+'): Type='+a.type+', Location='+a.location+', Health='+a.health_score+'%';
+        if(a.install_date)ctx+=', InstallDate='+a.install_date;
+        if(a.warranty_exp)ctx+=', WarrantyExp='+a.warranty_exp;
+        if(ka.total_wo)ctx+=', TotalWOs='+ka.total_wo+', CompletedWOs='+ka.completed_wo;
+        ctx+='\n';
+      });
+      callAI('As a maintenance engineer, analyze these assets and provide:\n1. Critical assets needing immediate attention (health <70%)\n2. Maintenance patterns per asset\n3. Replacement/overhaul recommendations\n4. Preventive maintenance priorities\n5. Cost-saving opportunities\n\n'+ctx, 'aiModalBody');
+    });
+  });
+}
+function aiAnalyzeParts(){
+  openModal('aiModal');
+  document.getElementById('aiModalBody').innerHTML='<div class="ai-loading"><div class="ai-dots"><span></span><span></span><span></span></div> Analyzing inventory...</div>';
+  api('/api/spare-parts').then(function(d){
+    var parts=d.parts||[];
+    var ctx='Spare Parts Inventory Analysis:\n';
+    ctx+='Total Parts: '+parts.length+', Low Stock Items: '+d.low_stock_count+'\n\n';
+    parts.forEach(function(p){
+      ctx+='- '+p.name+(p.part_no?' ('+p.part_no+')':'')+': Qty='+p.quantity+'/Min='+p.min_qty;
+      if(p.unit_cost)ctx+=', Cost=฿'+p.unit_cost;
+      if(p.supplier)ctx+=', Supplier='+p.supplier;
+      ctx+=p.quantity<=p.min_qty?' [LOW STOCK]':'';
+      ctx+='\n';
+    });
+    callAI('As an inventory management expert for CMMS, analyze these spare parts and provide:\n1. Critical stock-out risks\n2. Reorder recommendations with quantities\n3. Cost optimization opportunities\n4. Storage and organization tips\n5. Supplier diversification advice\n\n'+ctx, 'aiModalBody');
+  });
+}
+function aiAnalyzePM(){
+  openModal('aiModal');
+  document.getElementById('aiModalBody').innerHTML='<div class="ai-loading"><div class="ai-dots"><span></span><span></span><span></span></div> Analyzing PM plans...</div>';
+  api('/api/pm-plans').then(function(plans){
+    var plist=Array.isArray(plans)?plans:[];
+    var now=new Date();
+    var ctx='Preventive Maintenance Analysis:\nTotal Plans: '+plist.length+'\n\n';
+    if(plist.length===0){
+      ctx+='No PM plans configured yet.\n';
+    }else{
+      plist.forEach(function(p){
+        ctx+='- '+p.title+': Asset='+( p.asset_name||'N/A')+', Frequency='+p.frequency_days+' days';
+        ctx+=', LastDone='+(p.last_done||'Never')+', NextDue='+(p.next_due||'Not set');
+        if(p.next_due&&new Date(p.next_due)<now)ctx+=' [OVERDUE]';
+        ctx+='\n';
+      });
+    }
+    callAI('As a maintenance planning expert, analyze these PM plans and provide:\n1. Overall PM program effectiveness\n2. Overdue and at-risk maintenance items\n3. Optimization of maintenance intervals\n4. Missing PM plans (based on typical industry standards)\n5. ROI improvement strategies for PM program\n\n'+ctx, 'aiModalBody');
+  });
+}
+function aiStrategy(){
+  openModal('aiModal');
+  document.getElementById('aiModalBody').innerHTML='<div class="ai-loading"><div class="ai-dots"><span></span><span></span><span></span></div> Generating maintenance strategy...</div>';
+  Promise.all([api('/api/kpi/summary'),api('/api/assets'),api('/api/work-orders'),api('/api/spare-parts'),api('/api/pm-plans')]).then(function(r){
+    var kpi=r[0].summary||r[0]||{};
+    var assets=Array.isArray(r[1])?r[1]:[];
+    var wos=Array.isArray(r[2])?r[2]:[];
+    var parts=(r[3].parts||[]);
+    var pms=Array.isArray(r[4])?r[4]:[];
+    var ctx='Full CMMS System Overview for Strategic Analysis:\n';
+    ctx+='KPIs: Total='+kpi.total+', Open='+kpi.open+', Completed='+kpi.completed+', Overdue='+kpi.overdue+', Critical='+kpi.critical+', AvgMTTR='+kpi.avgMttr+'h\n';
+    ctx+='Assets: '+assets.length+' total, avgHealth='+Math.round(assets.reduce(function(a,x){return a+(x.health_score||100);},0)/(assets.length||1))+'%\n';
+    ctx+='Low health assets: '+assets.filter(function(a){return (a.health_score||100)<70;}).map(function(a){return a.code+'('+a.health_score+'%)';}).join(',')+'\n';
+    ctx+='WO completion rate: '+Math.round((kpi.completed/(kpi.total||1))*100)+'%\n';
+    ctx+='PM plans: '+pms.length+'\n';
+    ctx+='Low stock parts: '+(r[3].low_stock_count||0)+'\n';
+    callAI('As a senior maintenance strategy consultant, develop a comprehensive maintenance strategy based on this data. Include:\n1. Executive summary of current maintenance maturity\n2. Critical risks and immediate actions (next 30 days)\n3. Short-term improvement plan (30-90 days)\n4. Long-term transformation roadmap (6-12 months)\n5. KPI targets to measure success\n6. Budget considerations\n7. Technology recommendations\n\n'+ctx, 'aiModalBody');
+  });
+}
+function aiWO(id){
+  var w=_wos.find(function(x){return x.id===id;});
+  if(!w)return;
+  var detailEl=document.getElementById('woAiDetail');
+  if(detailEl){
+    detailEl.innerHTML='<div class="ai-loading"><div class="ai-dots"><span></span><span></span><span></span></div> Analyzing...</div>';
+  }else{
+    openModal('aiModal');
+    document.getElementById('aiModalBody').innerHTML='<div class="ai-loading"><div class="ai-dots"><span></span><span></span><span></span></div> Analyzing work order...</div>';
+  }
+  var ctx='Work Order Details:\n';
+  ctx+='WO: '+w.wo_number+', Title: '+w.title+'\n';
+  ctx+='Status: '+w.status+', Priority: '+w.priority+', Type: '+w.type+'\n';
+  ctx+='Asset: '+(w.asset_name||'N/A')+', Assigned: '+(w.assigned_to||'Unassigned')+'\n';
+  ctx+='SLA: '+w.sla_hours+'h, Deadline: '+(w.sla_deadline||'N/A')+'\n';
+  if(w.description)ctx+='Description: '+w.description+'\n';
+  if(w.root_cause)ctx+='Root Cause: '+w.root_cause+'\n';
+  if(w.labor_hours)ctx+='Labor Hours: '+w.labor_hours+'h\n';
+  var targetEl=detailEl?'woAiDetail':'aiModalBody';
+  callAI('Analyze this specific work order as a maintenance expert:\n1. Assessment of issue severity and urgency\n2. Recommended troubleshooting steps\n3. Estimated repair time and resources needed\n4. Root cause analysis (if not provided)\n5. Preventive measures to avoid recurrence\n6. Safety considerations\n\n'+ctx, targetEl);
+}
+function aiAsset(id,code,name){
+  openModal('aiModal');
+  document.getElementById('aiModalBody').innerHTML='<div class="ai-loading"><div class="ai-dots"><span></span><span></span><span></span></div> Analyzing asset...</div>';
+  var a=_assets.find(function(x){return x.id===id;})||{};
+  api('/api/work-orders').then(function(wos){
+    var wlist=(Array.isArray(wos)?wos:[]).filter(function(w){return w.asset_id===id;});
+    var ctx='Asset Analysis: '+code+' - '+name+'\n';
+    ctx+='Type: '+a.type+', Location: '+(a.location||'N/A')+'\n';
+    ctx+='Manufacturer: '+(a.manufacturer||'N/A')+', Model: '+(a.model||'N/A')+'\n';
+    ctx+='Install Date: '+(a.install_date||'N/A')+', Warranty Exp: '+(a.warranty_exp||'N/A')+'\n';
+    ctx+='Health Score: '+(a.health_score||100)+'%\n';
+    ctx+='Work Orders: '+wlist.length+' total\n';
+    if(wlist.length>0){
+      ctx+='Recent WOs: '+wlist.slice(0,5).map(function(w){return w.wo_number+'('+w.status+','+w.priority+')';}).join(', ')+'\n';
+      ctx+='Avg Labor Hours: '+Math.round(wlist.filter(function(w){return w.labor_hours;}).reduce(function(a,w){return a+w.labor_hours;},0)/(wlist.filter(function(w){return w.labor_hours;}).length||1)*10)/10+'h\n';
+    }
+    callAI('Perform a comprehensive asset analysis for this equipment:\n1. Health assessment based on score and maintenance history\n2. Reliability analysis (failure frequency, patterns)\n3. Maintenance cost estimation\n4. Remaining useful life estimate\n5. Recommended PM intervals for this specific asset type\n6. Upgrade/replacement recommendation\n7. Critical spare parts to stock\n\n'+ctx, 'aiModalBody');
+  });
+}
+
+// ========== CORE AI CALLER ==========
+function callAI(prompt, targetId){
+  fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:1000,
+      messages:[{role:'user',content:prompt}]
+    })
+  }).then(function(r){return r.json();})
+  .then(function(d){
+    var el=document.getElementById(targetId);
+    if(!el)return;
+    if(d.content&&d.content[0]&&d.content[0].text){
+      var text=d.content[0].text;
+      // Format with simple markdown-like styling
+      text=text.replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--tx)">$1</strong>');
+      text=text.replace(/###\s*(.*)/g,'<div style="font-size:13px;font-weight:700;color:var(--purple);margin:12px 0 6px">$1</div>');
+      text=text.replace(/##\s*(.*)/g,'<div style="font-size:14px;font-weight:700;color:var(--blue);margin:14px 0 8px">$1</div>');
+      text=text.replace(/\n(\d+\.\s)/g,'\n<span style="color:var(--blue);font-weight:700">$1</span>');
+      text=text.replace(/\n-\s/g,'\n<span style="color:var(--tx3)">• </span>');
+      el.innerHTML=text;
+    }else if(d.error){
+      el.innerHTML='<span style="color:var(--red)">⚠️ AI Error: '+d.error.message+'</span>';
+    }else{
+      el.innerHTML='<span style="color:var(--tx3)">No response received</span>';
+    }
+  }).catch(function(e){
+    var el=document.getElementById(targetId);
+    if(el)el.innerHTML='<span style="color:var(--red)">⚠️ Connection error: '+e.message+'</span>';
+  });
+}
+
+// ========== PUBLIC REQUEST ==========
+function submitPub(){
+  var b={
+    title:document.getElementById('pt').value.trim(),
+    requester_name:document.getElementById('pn').value.trim(),
+    requester_contact:document.getElementById('pc').value.trim(),
+    description:document.getElementById('pd').value.trim()
+  };
+  if(!b.title){toast('Please enter issue title','err');return;}
+  fetch('/api/work-orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(d.wo_number){
+      toast('✅ Request submitted! WO#: '+d.wo_number,'ok');
+      closeModal('pubModal');
+      document.getElementById('pt').value='';
+      document.getElementById('pn').value='';
+      document.getElementById('pc').value='';
+      document.getElementById('pd').value='';
+    }else toast(d.error||'Submission failed','err');
+  });
+}
+
+// ========== UI HELPERS ==========
+function openModal(id){document.getElementById(id).classList.add('active');}
+function closeModal(id){document.getElementById(id).classList.remove('active');}
+function toast(msg,type,dur){
+  var t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast show '+(type||'ok');
+  clearTimeout(t._tid);
+  t._tid=setTimeout(function(){t.classList.remove('show');},dur||3500);
+}
+// Close modal on overlay click
+document.querySelectorAll('.moverlay').forEach(function(el){
+  el.addEventListener('click',function(e){if(e.target===el)closeModal(el.id);});
+});
+// ESC key
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){document.querySelectorAll('.moverlay.active').forEach(function(m){closeModal(m.id);});}
+});
+</script>
+</body>
+</html>
