@@ -232,6 +232,38 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", app: "CMMS PRO", version: "3.0.1", time: new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }), timezone: "Asia/Bangkok" });
 });
 
+
+// AI PROXY ENDPOINT
+app.post("/api/ai/analyze", auth(), async (req, res) => {
+  const { prompt } = req.body;
+  if (!prompt) return res.status(400).json({ error: "prompt required" });
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: "AI not configured - set ANTHROPIC_API_KEY" });
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1500,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+    const d = await r.json();
+    if (d.content && d.content[0]) {
+      res.json({ text: d.content[0].text });
+    } else {
+      res.status(500).json({ error: d.error?.message || "AI error" });
+    }
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // SPA FALLBACK
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "index.html"));
