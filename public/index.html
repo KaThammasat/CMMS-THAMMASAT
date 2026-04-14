@@ -1,7 +1,87 @@
 <!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CMMS PRO</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js">
+function loadAIPage(){
+  var h='<div class="phdr"><div class="ptitle">AI Analysis</div></div>';
+  h+='<div class="aigrid">';
+  [["aiDash","Dashboard Insight","Overall health and recommendations"],
+   ["aiAssets","Asset Health Check","Equipment analysis and risks"],
+   ["aiWOs","WO Trend Analysis","Patterns and efficiency insights"],
+   ["aiParts","Inventory Analysis","Stock and procurement advice"],
+   ["aiPM","PM Review","Maintenance schedule effectiveness"],
+   ["aiStrategy","Full Strategy","Complete maintenance optimization"]
+  ].forEach(function(c){
+    h+='<div class="aicard" onclick="'+c[0]+'()"><div style="font-size:28px;margin-bottom:8px">AI</div>';
+    h+='<div style="font-size:14px;font-weight:700;color:var(--tx);margin-bottom:4px">'+c[1]+'</div>';
+    h+='<div style="font-size:12px;color:var(--tx3)">'+c[2]+'</div></div>';
+  });
+  h+='</div><div class="aip"><div class="ait">Ask AI About Your Maintenance</div>';
+  h+='<div style="display:flex;gap:8px;margin-bottom:10px">';
+  h+='<input type="text" class="fi" id="aiQ" placeholder="e.g. Which equipment needs attention?" style="flex:1" onkeydown="if(event.key==='Enter')askAI()">';
+  h+='<button class="btn btn-ai" onclick="askAI()">Ask AI</button></div>';
+  h+='<div class="aib" id="aiChat">Ask any question about your maintenance operations.</div></div>';
+  document.getElementById("pAI").innerHTML=h;
+}
+function callAI(prompt,elId){
+  var el=document.getElementById(elId);if(!el)return;
+  el.innerHTML='<div style="color:#4a6080">Analyzing... <span class="ads"><span></span><span></span><span></span></span></div>';
+  fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.content&&d.content[0]&&d.content[0].text){
+      var t=d.content[0].text.replace(/**(.*?)**/g,'<strong style="color:var(--tx)">$1</strong>').replace(/##s*(.*)/g,'<div style="font-weight:700;color:#3d8fff;margin:8px 0 4px">$1</div>');
+      el.innerHTML=t;
+    }else el.innerHTML='<span style="color:var(--red)">Error: '+(d.error&&d.error.message||JSON.stringify(d))+'</span>';
+  }).catch(function(e){el.innerHTML='<span style="color:var(--red)">Error: '+e.message+'</span>';});
+}
+function getCtx(cb){
+  Promise.all([api("/api/kpi/summary"),api("/api/assets"),api("/api/work-orders"),api("/api/spare-parts")]).then(function(r){
+    var s=(r[0].summary||r[0])||{};
+    var ctx="System KPIs: Total WOs="+s.total+", Open="+s.open+", InProgress="+s.inprog+", Completed="+s.completed+", Overdue="+s.overdue+", Critical="+s.critical+", AvgMTTR="+s.avgMttr+"h
+";
+    ctx+="Assets("+((Array.isArray(r[1])?r[1]:[]).length)+"): "+(Array.isArray(r[1])?r[1]:[]).map(function(a){return a.code+"("+a.type+",health:"+a.health_score+"%)";}).join(", ")+"
+";
+    ctx+="LowStock: "+((r[3].parts||[]).filter(function(p){return p.quantity<=p.min_qty;}).map(function(p){return p.name+"("+p.quantity+"/"+p.min_qty+")";}).join(", ")||"none");
+    cb(ctx);
+  });
+}
+function showAIResult(title,prompt){
+  var existing=document.getElementById("aiResultModal");if(existing)existing.remove();
+  var mo=document.createElement("div");mo.id="aiResultModal";
+  mo.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px";
+  mo.innerHTML='<div style="background:var(--bg2);border:1px solid rgba(157,111,255,.3);border-radius:14px;padding:24px;width:100%;max-width:680px;max-height:85vh;overflow-y:auto"><div style="font-size:16px;font-weight:700;margin-bottom:16px;color:#9d6fff">'+title+'</div><div class="aib" id="aiModalBody">Loading...</div><div style="margin-top:16px;text-align:right"><button class="btn btn-s" onclick="document.getElementById('aiResultModal').remove()">Close</button></div></div>';
+  document.body.appendChild(mo);
+  mo.addEventListener("click",function(e){if(e.target===mo)mo.remove();});
+  callAI(prompt,"aiModalBody");
+}
+function aiDash(){getCtx(function(ctx){showAIResult("Dashboard Insight","CMMS maintenance expert: Analyze this dashboard and give: 1) Overall health assessment 2) Top 3 concerns 3) Recommended immediate actions. Be concise and practical.
+
+"+ctx);});}
+function aiAssets(){getCtx(function(ctx){showAIResult("Asset Health Check","Maintenance engineer: Analyze assets and provide: 1) Critical assets needing attention 2) Replacement recommendations 3) PM priorities
+
+"+ctx);});}
+function aiWOs(){getCtx(function(ctx){showAIResult("Work Order Analysis","CMMS expert: Analyze work orders and provide: 1) Efficiency assessment 2) Patterns and recurring issues 3) Staff workload insights 4) Improvement actions
+
+"+ctx);});}
+function aiParts(){getCtx(function(ctx){showAIResult("Inventory Analysis","Inventory expert: 1) Stock-out risks 2) Reorder recommendations 3) Cost optimization opportunities
+
+"+ctx);});}
+function aiPM(){getCtx(function(ctx){showAIResult("PM Schedule Review","Maintenance planner: 1) PM program effectiveness 2) Overdue items 3) Interval optimization 4) ROI improvements
+
+"+ctx);});}
+function aiStrategy(){getCtx(function(ctx){showAIResult("Maintenance Strategy","Senior consultant: Develop strategy with 1) Current maturity assessment 2) 30-day critical actions 3) 90-day improvement plan 4) KPI targets 5) Technology recommendations
+
+"+ctx);});}
+function askAI(){var q=(document.getElementById("aiQ")||{}).value||"";if(!q){toast("Please enter a question","err");return;}getCtx(function(ctx){callAI("CMMS maintenance advisor - Answer this question based on system data:
+
+Question: "+q+"
+
+System Data:
+"+ctx+"
+
+Provide specific, actionable advice.","aiChat");});}
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#0a0e1a;--bg2:#0f1629;--bg3:#141e35;--bd:rgba(40,70,140,.4);--bd2:rgba(60,100,200,.5);--tx:#c8d8f0;--tx2:#7a9cc8;--tx3:#4a6888;--blue:#4d9fff;--blue2:#1a5fcc;--green:#00c87a;--amber:#ffb800;--red:#ff3d5a;--cyan:#00e5ff;}
@@ -68,7 +148,7 @@ tr:hover td{background:rgba(77,159,255,.04)}
 .toast.show{transform:translateY(0);opacity:1}.toast.ok{border-color:var(--green);color:var(--green)}.toast.err{border-color:var(--red);color:var(--red)}
 .phdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
 .ptitle{font-size:18px;font-weight:700}.sbt{padding:16px;font-weight:700;font-size:13px;color:var(--tx2)}.nodata{text-align:center;padding:40px;color:var(--tx3)}
-</style></head><body>
+.aip{background:linear-gradient(135deg,rgba(157,111,255,.08),rgba(61,143,255,.06));border:1px solid rgba(157,111,255,.25);border-radius:12px;padding:18px;margin-bottom:18px}.ait{font-size:14px;font-weight:700;color:#9d6fff;margin-bottom:10px}.aib{background:rgba(0,0,0,.25);border-radius:8px;padding:14px;font-size:13px;line-height:1.7;color:#7a9fc8;min-height:50px;white-space:pre-wrap}.ads span{animation:dk 1.2s infinite;display:inline-block;width:6px;height:6px;border-radius:50%;background:#9d6fff;margin:0 2px}.ads span:nth-child(2){animation-delay:.2s}.ads span:nth-child(3){animation-delay:.4s}@keyframes dk{0%,80%,100%{transform:scale(.7);opacity:.5}40%{transform:scale(1);opacity:1}}.aigrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:18px}.aicard{background:var(--bg2);border:1px solid rgba(157,111,255,.2);border-radius:10px;padding:14px;cursor:pointer;transition:all .2s}.aicard:hover{border-color:rgba(157,111,255,.5)}.btn-ai{background:linear-gradient(135deg,rgba(157,111,255,.2),rgba(61,143,255,.2));color:#9d6fff;border:1px solid rgba(157,111,255,.4)}.btn-ai:hover{background:linear-gradient(135deg,rgba(157,111,255,.3),rgba(61,143,255,.3))}</style></head><body>
 <div id="loginPage"><div class="lcard">
 <div class="logo">CMMS PRO</div>
 <div class="sub">Maintenance Management System v3.0</div>
@@ -93,7 +173,7 @@ tr:hover td{background:rgba(77,159,255,.04)}
 <div class="page" id="pWO"></div>
 <div class="page" id="pAssets"></div>
 <div class="page" id="pParts"></div>
-<div class="page" id="pPM"></div>
+<div class="page" id="pPM"></div><div class="page" id="pAI"></div>
 </div></div></div>
 <div class="moverlay" id="pubModal"><div class="modal">
 <h3>Report Maintenance Issue</h3>
@@ -128,8 +208,8 @@ function doLogin(){var p=document.getElementById("pinInput").value;if(!p)return;
 function logout(){T="";R="";N="";localStorage.removeItem("ct");localStorage.removeItem("cr");localStorage.removeItem("cn");showLogin();}
 function showLogin(){document.getElementById("loginPage").style.display="flex";document.getElementById("appPage").style.display="none";}
 function showApp(){document.getElementById("loginPage").style.display="none";document.getElementById("appPage").style.display="flex";document.getElementById("uchip").textContent=N+" ("+R+")";renderSB();setInterval(function(){document.getElementById("clk").textContent=new Date().toLocaleTimeString("th-TH",{timeZone:"Asia/Bangkok"});},1000);}
-function renderSB(){var items=[["Dash","Dashboard"],["WO","Work Orders"],["Assets","Assets"],["Parts","Spare Parts"],["PM","PM Plans"]];var h="<div class=\"sbt\">Navigation</div>";items.forEach(function(i){h+="<div class=\"ni\" id=\"nav"+i[0]+"\" onclick=\"navTo('"+i[0]+"')\">" +i[1]+"</div>";});document.getElementById("sb").innerHTML=h;}
-function navTo(p){document.querySelectorAll(".page").forEach(function(x){x.classList.remove("active");});document.querySelectorAll(".ni").forEach(function(x){x.classList.remove("active");});var pg=document.getElementById("p"+p);if(pg)pg.classList.add("active");var nav=document.getElementById("nav"+p);if(nav)nav.classList.add("active");if(p==="Dash")loadDash();if(p==="WO")loadWO();if(p==="Assets")loadAssets();if(p==="Parts")loadParts();if(p==="PM")loadPM();}
+function renderSB(){var items=[["Dash","Dashboard"],["WO","Work Orders"],["Assets","Assets"],["Parts","Spare Parts"],["PM","PM Plans"],["AI","AI Analysis"]];var h="<div class=\"sbt\">Navigation</div>";items.forEach(function(i){h+="<div class=\"ni\" id=\"nav"+i[0]+"\" onclick=\"navTo('"+i[0]+"')\">" +i[1]+"</div>";});document.getElementById("sb").innerHTML=h;}
+function navTo(p){document.querySelectorAll(".page").forEach(function(x){x.classList.remove("active");});document.querySelectorAll(".ni").forEach(function(x){x.classList.remove("active");});var pg=document.getElementById("p"+p);if(pg)pg.classList.add("active");var nav=document.getElementById("nav"+p);if(nav)nav.classList.add("active");if(p==="Dash")loadDash();if(p==="WO")loadWO();if(p==="Assets")loadAssets();if(p==="Parts")loadParts();if(p==="PM")loadPM();if(p==="AI")loadAIPage();}
 function api(path,opts){var o=opts||{};o.headers=o.headers||{};o.headers["Authorization"]="Bearer "+T;o.headers["Content-Type"]="application/json";return fetch(path,o).then(function(r){return r.json();});}
 function sb(s){var m={open:"b-open",in_progress:"b-inp",completed:"b-done",overdue:"b-over"};return "<span class=\"badge "+(m[s]||"b-open")+"\">"+s+"</span>";}
 function pb(p){var m={critical:"b-crit",high:"b-high",medium:"b-med",low:"b-low"};return "<span class=\"badge "+(m[p]||"b-med")+"\">"+p+"</span>";}
