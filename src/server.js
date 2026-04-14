@@ -233,35 +233,89 @@ app.get("/api/health", (req, res) => {
 });
 
 
-// AI PROXY ENDPOINT
+// AI PROXY ENDPOINT - Multi-Provider (Gemini Free / OpenAI / Claude)
 app.post("/api/ai/analyze", auth(), async (req, res) => {
-  const { prompt } = req.body;
+  const { prompt, provider } = req.body;
   if (!prompt) return res.status(400).json({ error: "prompt required" });
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: "AI not configured - set ANTHROPIC_API_KEY" });
+
+  // Try providers in order: Gemini (free) -> OpenAI -> Claude
+  const geminiKey   = process.env.GEMINI_API_KEY;
+  const openaiKey   = process.env.OPENAI_API_KEY;
+  const claudeKey   = process.env.ANTHROPIC_API_KEY;
+
+  const useProvider = provider || (geminiKey ? "gemini" : openaiKey ? "openai" : claudeKey ? "claude" : null);
+
+  if (!useProvider) {
+    return res.status(503).json({ error: "No AI configured. Set GEMINI_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY in Railway Variables." });
+  }
+
   try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1500,
-        messages: [{ role: "user", content: prompt }]
-      })
-    });
-    const d = await r.json();
-    if (d.content && d.content[0]) {
-      res.json({ text: d.content[0].text });
-    } else {
-      res.status(500).json({ error: d.error?.message || "AI error" });
+    // ---- GEMINI (Free: 15 req/min, 1M tokens/day) ----
+    if (useProvider === "gemini" && geminiKey) {
+      const r = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + geminiKey,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { maxOutputTokens: 1500, temperature: 0.7 }
+          })
+        }
+      );
+      const d = await r.json();
+      if (d.candidates && d.candidates[0]?.content?.parts?.[0]?.text) {
+        return res.json({ text: d.candidates[0].content.parts[0].text, provider: "Gemini 1.5 Flash (Free)" });
+      }
+      if (d.error) throw new Error("Gemini: " + d.error.message);
     }
+
+    // ---- OPENAI GPT-4o-mini ----
+    if (useProvider === "openai" && openaiKey) {
+      const r = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + openaiKey },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          max_tokens: 1500,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+      const d = await r.json();
+      if (d.choices?.[0]?.message?.content) {
+        return res.json({ text: d.choices[0].message.content, provider: "GPT-4o-mini" });
+      }
+      if (d.error) throw new Error("OpenAI: " + d.error.message);
+    }
+
+    // ---- CLAUDE (Anthropic) ----
+    if (useProvider === "claude" && claudeKey) {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": claudeKey, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1500, messages: [{ role: "user", content: prompt }] })
+      });
+      const d = await r.json();
+      if (d.content?.[0]?.text) {
+        return res.json({ text: d.content[0].text, provider: "Claude Sonnet" });
+      }
+      if (d.error) throw new Error("Claude: " + d.error.message);
+    }
+
+    res.status(503).json({ error: "Selected AI provider not available. Check API key configuration." });
   } catch(e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// AI STATUS - show which providers are configured
+app.get("/api/ai/status", auth(), (req, res) => {
+  res.json({
+    gemini:  !!process.env.GEMINI_API_KEY,
+    openai:  !!process.env.OPENAI_API_KEY,
+    claude:  !!process.env.ANTHROPIC_API_KEY,
+    active:  process.env.GEMINI_API_KEY ? "gemini" : process.env.OPENAI_API_KEY ? "openai" : process.env.ANTHROPIC_API_KEY ? "claude" : "none"
+  });
 });
 
 // SPA FALLBACK
