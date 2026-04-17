@@ -1,0 +1,35 @@
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+import LanguageDetector from 'i18next-browser-languagedetector';
+
+const resources = {
+  th: {
+    translation: {
+      appName: 'CMMS อุตสาหกรรม',
+      nav: { dashboard: 'แดชบอร์ด', workOrders: 'ใบแจ้งซ่อม', equipment: 'เครื่องจักร', sites: 'ไซต์' },
+      wo: { title: 'ใบแจ้งซ่อม', number: 'เลขที่', status: 'สถานะ', priority: 'ความเร่งด่วน' },
+      equipment: { title: 'เครื่องจักร', code: 'รหัส', name: 'ชื่อ', status: 'สถานะ' },
+      common: { save: 'บันทึก', cancel: 'ยกเลิก', delete: 'ลบ', edit: 'แก้ไข', create: 'สร้าง' }
+    }
+  },
+  en: {
+    translation: {
+      appName: 'Industrial CMMS',
+      nav: { dashboard: 'Dashboard', workOrders: 'Work Orders', equipment: 'Equipment', sites: 'Sites' },
+      wo: { title: 'Work Order', number: 'Number', status: 'Status', priority: 'Priority' },
+      equipment: { title: 'Equipment', code: 'Code', name: 'Name', status: 'Status' },
+      common: { save: 'Save', cancel: 'Cancel', delete: 'Delete', edit: 'Edit', create: 'Create' }
+    }
+  }
+};
+
+i18n
+  .use(LanguageDetector)
+  .use(initReactI18next)
+  .init({
+    resources,
+    fallbackLng: 'th',
+    interpolation: { escapeValue: false }
+  });
+
+export default i18n;
