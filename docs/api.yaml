@@ -1,0 +1,506 @@
+openapi: 3.0.3
+info:
+  title: CMMS Thammasat Industrial API
+  version: 5.0.0
+  description: |
+    Computerized Maintenance Management System for industrial facilities.
+    
+    ## Authentication
+    All endpoints (except `/auth/login`) require a JWT Bearer token.
+    
+    ## Response Format
+    All responses follow: `{ success: boolean, data: any, error?: string }`
+    
+  contact:
+    name: Thammasat Engineering Team
+    email: cmms@thammasat.ac.th
+
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Local development
+  - url: https://cmms.thammasat.ac.th/api/v1
+    description: Production
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data: { type: object }
+        error: { type: string }
+
+    Equipment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        asset_code: { type: string, example: "CNC-001" }
+        name: { type: string, example: "CNC Machining Center #1" }
+        type:
+          type: string
+          enum: [cnc, pump, hvac, compressor, motor, conveyor, generator, boiler, crane, robot]
+        criticality:
+          type: string
+          enum: [critical, high, medium, low]
+        health_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          example: 78
+        cost_per_minute:
+          type: number
+          example: 850.00
+          description: Production loss cost per minute of downtime (THB)
+        manufacturer: { type: string }
+        model: { type: string }
+        runtime_hours: { type: number }
+        next_maintenance_date: { type: string, format: date-time }
+
+    WorkOrder:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        wo_number: { type: string, example: "WO-2026-001001" }
+        equipment_id: { type: string, format: uuid }
+        type:
+          type: string
+          enum: [corrective, preventive, predictive, inspection, project]
+        status:
+          type: string
+          enum: [draft, open, assigned, in_progress, pending_approval, loto_prep, loto_executed, completed, closed, cancelled]
+        priority:
+          type: string
+          enum: [critical, high, medium, low]
+        title: { type: string }
+        description: { type: string }
+        sla_due_at: { type: string, format: date-time }
+        sla_breached: { type: boolean }
+        assigned_to: { type: string, format: uuid }
+        estimated_hours: { type: number }
+        actual_hours: { type: number }
+        actual_cost: { type: number }
+
+    DowntimeRecord:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        equipment_id: { type: string, format: uuid }
+        type:
+          type: string
+          enum: [breakdown, planned, setup, idle]
+        category:
+          type: string
+          enum: [electrical, mechanical, hydraulic, pneumatic, software, operator, material, quality]
+        start_time: { type: string, format: date-time }
+        end_time: { type: string, format: date-time, nullable: true }
+        duration_minutes: { type: number }
+        downtime_cost: { type: number, description: "Auto-calculated: duration × cost_per_minute" }
+        lost_production_units: { type: number }
+
+    KPISummary:
+      type: object
+      properties:
+        mttr:
+          type: object
+          properties:
+            hours: { type: number, example: 3.8, description: "Mean Time To Repair in hours" }
+            completedCount: { type: integer }
+        mtbf:
+          type: object
+          properties:
+            hours: { type: number, example: 214, description: "Mean Time Between Failures in hours" }
+            failureCount: { type: integer }
+        oee:
+          type: object
+          properties:
+            overall: { type: number, example: 82.4 }
+            availability: { type: number, example: 91.2 }
+            performance: { type: number, example: 92.0 }
+            quality: { type: number, example: 98.5 }
+        downtime:
+          type: object
+          properties:
+            totalIncidents: { type: integer }
+            totalMinutes: { type: number }
+            totalCost: { type: number }
+            breakdowns: { type: integer }
+
+    AIPrediction:
+      type: object
+      properties:
+        riskScore: { type: number, minimum: 0, maximum: 100, example: 78.5 }
+        failureProbability: { type: number, minimum: 0, maximum: 1, example: 0.785 }
+        estimatedFailureDate: { type: string, format: date }
+        daysToFailure: { type: integer, example: 3 }
+        failureMode: { type: string, example: "Bearing wear / imbalance" }
+        recommendation: { type: string }
+        confidenceLevel: { type: number, example: 87.2 }
+
+paths:
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login and get JWT token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email, example: "manager@thammasat.ac.th" }
+                password: { type: string, example: "password123" }
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          accessToken: { type: string }
+                          refreshToken: { type: string }
+                          user: { type: object }
+        '401':
+          description: Invalid credentials
+
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get current user profile
+      responses:
+        '200':
+          description: User profile
+        '401':
+          description: Unauthorized
+
+  /equipment:
+    get:
+      tags: [Equipment]
+      summary: List all equipment
+      parameters:
+        - name: criticality
+          in: query
+          schema:
+            type: string
+            enum: [critical, high, medium, low]
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Equipment list with pagination
+    post:
+      tags: [Equipment]
+      summary: Create new equipment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Equipment'
+      responses:
+        '201':
+          description: Equipment created
+        '409':
+          description: Asset code already exists
+
+  /equipment/{id}:
+    get:
+      tags: [Equipment]
+      summary: Get equipment detail with WOs, PM schedules, predictions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Equipment detail
+        '404':
+          description: Equipment not found
+    patch:
+      tags: [Equipment]
+      summary: Update equipment fields
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Equipment updated
+
+  /equipment/{id}/predict:
+    get:
+      tags: [Equipment, AI]
+      summary: Run AI failure prediction for equipment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: AI prediction result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AIPrediction'
+
+  /work-orders:
+    get:
+      tags: [Work Orders]
+      summary: List work orders
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: priority
+          in: query
+          schema: { type: string }
+        - name: assigned_to
+          in: query
+          schema: { type: string, format: uuid }
+        - name: equipment_id
+          in: query
+          schema: { type: string, format: uuid }
+        - name: sla_breached
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Work order list
+    post:
+      tags: [Work Orders]
+      summary: Create new work order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [equipment_id, type, priority, title]
+              properties:
+                equipment_id: { type: string, format: uuid }
+                type: { type: string, enum: [corrective, preventive, predictive, inspection] }
+                priority: { type: string, enum: [critical, high, medium, low] }
+                title: { type: string }
+                description: { type: string }
+                assigned_to: { type: string, format: uuid }
+                estimated_hours: { type: number }
+                tasks: { type: array, items: { type: string } }
+      responses:
+        '201':
+          description: Work order created with SLA automatically set
+
+  /work-orders/{id}/status:
+    patch:
+      tags: [Work Orders]
+      summary: Update work order status (lifecycle transition)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [open, assigned, in_progress, pending_approval, loto_prep, loto_executed, completed, closed, cancelled]
+                actual_hours: { type: number }
+                root_cause: { type: string }
+                corrective_action: { type: string }
+      responses:
+        '200':
+          description: Status updated, real-time event emitted
+
+  /downtime:
+    get:
+      tags: [Downtime]
+      summary: List downtime records
+      parameters:
+        - name: active_only
+          in: query
+          schema: { type: boolean }
+        - name: equipment_id
+          in: query
+          schema: { type: string, format: uuid }
+        - name: type
+          in: query
+          schema: { type: string, enum: [breakdown, planned, setup, idle] }
+      responses:
+        '200':
+          description: Downtime records with live cost calculation
+    post:
+      tags: [Downtime]
+      summary: Start a downtime record (triggers auto WO for breakdowns)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [equipment_id, type]
+              properties:
+                equipment_id: { type: string, format: uuid }
+                type: { type: string, enum: [breakdown, planned, setup, idle] }
+                category: { type: string, enum: [electrical, mechanical, hydraulic, pneumatic, software, operator, material, quality] }
+                description: { type: string }
+      responses:
+        '201':
+          description: Downtime started. For type=breakdown, a Work Order is auto-created by DB trigger.
+        '409':
+          description: Equipment already has active downtime
+
+  /downtime/{id}/end:
+    patch:
+      tags: [Downtime]
+      summary: End downtime — auto-calculates cost
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                root_cause: { type: string }
+                prevention_action: { type: string }
+      responses:
+        '200':
+          description: Downtime ended. downtime_cost = duration_minutes × cost_per_minute
+
+  /kpi/summary:
+    get:
+      tags: [KPI]
+      summary: Full KPI dashboard - MTTR, MTBF, OEE, Downtime Cost
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+        - name: equipment_id
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: KPI summary
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/KPISummary'
+
+  /loto:
+    post:
+      tags: [LOTO Safety]
+      summary: Initiate LOTO procedure - energy isolation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [equipment_id, energy_sources]
+              properties:
+                equipment_id: { type: string, format: uuid }
+                work_order_id: { type: string, format: uuid }
+                energy_sources:
+                  type: array
+                  items:
+                    type: object
+                    required: [type, location]
+                    properties:
+                      type: { type: string, enum: [electrical, hydraulic, pneumatic, thermal, gravitational, chemical] }
+                      location: { type: string, example: "MDB-Panel-A1" }
+                      voltage: { type: string, example: "415V" }
+      responses:
+        '201':
+          description: LOTO procedure initiated. Work order status set to loto_prep.
+        '409':
+          description: Active LOTO already exists for equipment
+
+  /alerts:
+    get:
+      tags: [Alerts]
+      summary: List system alerts
+      parameters:
+        - name: unread_only
+          in: query
+          schema: { type: boolean }
+        - name: severity
+          in: query
+          schema: { type: string, enum: [critical, high, medium, low, info] }
+      responses:
+        '200':
+          description: Alert list
+
+tags:
+  - name: Authentication
+    description: JWT login and user management
+  - name: Equipment
+    description: Asset hierarchy, health scores, sensor data
+  - name: Work Orders
+    description: Full lifecycle work order management with SLA tracking
+  - name: Downtime
+    description: Downtime tracking with automatic cost calculation
+  - name: KPI
+    description: MTTR, MTBF, OEE, Availability calculations
+  - name: LOTO Safety
+    description: Lockout-Tagout energy isolation procedures
+  - name: AI
+    description: Predictive maintenance failure analysis
+  - name: Alerts
+    description: Real-time system alerts and notifications
