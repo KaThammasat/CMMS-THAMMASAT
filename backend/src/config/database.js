@@ -1,23 +1,39 @@
 /**
- * Database Configuration
- * PostgreSQL with connection pooling
+ * Database Configuration - Railway compatible
+ * Supports both DATABASE_URL (Railway) and individual params
  */
 'use strict';
 
 const { Pool } = require('pg');
 const logger = require('../utils/logger');
 
-const poolConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'cmms_thammasat',
-  user: process.env.DB_USER || 'cmms_user',
-  password: process.env.DB_PASSWORD || 'cmms_secure_password',
-  max: parseInt(process.env.DB_POOL_MAX || '20'),
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
-};
+// Parse DATABASE_URL if provided (Railway injects this)
+let poolConfig;
+if (process.env.DATABASE_URL) {
+  poolConfig = {
+    connectionString: process.env.DATABASE_URL,
+    max: parseInt(process.env.DB_POOL_MAX || '10'),
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+    ssl: process.env.DATABASE_URL.includes('railway.internal')
+      ? false
+      : process.env.DB_SSL === 'true'
+      ? { rejectUnauthorized: false }
+      : false
+  };
+} else {
+  poolConfig = {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432'),
+    database: process.env.DB_NAME || 'cmms_thammasat',
+    user: process.env.DB_USER || 'cmms_user',
+    password: process.env.DB_PASSWORD || 'cmms_secure_password',
+    max: parseInt(process.env.DB_POOL_MAX || '10'),
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
+  };
+}
 
 const pool = new Pool(poolConfig);
 
@@ -25,15 +41,6 @@ pool.on('error', (err) => {
   logger.error('PostgreSQL pool error:', err);
 });
 
-pool.on('connect', () => {
-  logger.debug('New DB connection established');
-});
-
-/**
- * Execute a query with parameters
- * @param {string} text - SQL query
- * @param {Array} params - Query parameters
- */
 async function query(text, params = []) {
   const start = Date.now();
   try {
@@ -49,35 +56,17 @@ async function query(text, params = []) {
   }
 }
 
-/**
- * Get a client for transactions
- */
 async function getClient() {
   const client = await pool.connect();
-  const originalQuery = client.query.bind(client);
   const release = client.release.bind(client);
-
-  // Timeout safety
   const timeout = setTimeout(() => {
     logger.error('Client checked out for too long');
     client.release();
   }, 30000);
-
-  client.release = () => {
-    clearTimeout(timeout);
-    release();
-  };
-
-  client.query = (text, params) => {
-    return originalQuery(text, params);
-  };
-
+  client.release = () => { clearTimeout(timeout); release(); };
   return client;
 }
 
-/**
- * Run code in a transaction
- */
 async function withTransaction(fn) {
   const client = await getClient();
   try {
@@ -95,7 +84,8 @@ async function withTransaction(fn) {
 
 async function connectDB() {
   const client = await pool.connect();
-  await client.query('SELECT NOW()');
+  const result = await client.query('SELECT NOW() as now');
+  logger.info(`DB connected: ${result.rows[0].now}`);
   client.release();
   return pool;
 }
