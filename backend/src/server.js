@@ -104,6 +104,7 @@ async function connectDatabaseAsync() {
       await connectDB();
       logger.info('✅ Database connected');
       dbReady = true;
+      global.dbReady = true;
 
       // Init socket + schedulers
       const { initSocketIO, startSchedulers } = require('./services/socketService');

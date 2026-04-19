@@ -67,7 +67,7 @@ const { query } = require('../config/database');
 
 function startSchedulers(socketIO) {
   // ─── SLA Breach Check (every 5 minutes) ───────────────────────
-  cron.schedule('*/5 * * * *', async () => {
+  cron.schedule('*/5 * * * *', async () => { if (!global.dbReady) return;
     try {
       // Find WOs approaching SLA breach (within 1 hour)
       const approaching = await query(
@@ -117,7 +117,7 @@ function startSchedulers(socketIO) {
   });
 
   // ─── Inventory Low Stock Check (every hour) ────────────────────
-  cron.schedule('0 * * * *', async () => {
+  cron.schedule('0 * * * *', async () => { if (!global.dbReady) return;
     try {
       const lowStock = await query(
         `SELECT * FROM spare_parts
@@ -142,7 +142,7 @@ function startSchedulers(socketIO) {
   });
 
   // ─── PM Due Check (daily at 6 AM) ─────────────────────────────
-  cron.schedule('0 6 * * *', async () => {
+  cron.schedule('0 6 * * *', async () => { if (!global.dbReady) return;
     try {
       const duePMs = await query(
         `SELECT pm.*, e.name as equipment_name, e.asset_code
@@ -167,7 +167,7 @@ function startSchedulers(socketIO) {
 
   // ─── Simulated Sensor Data (dev only, every 30 seconds) ───────
   if (process.env.NODE_ENV !== 'production') {
-    cron.schedule('*/30 * * * * *', async () => {
+    cron.schedule('*/30 * * * * *', async () => { if (!global.dbReady) return;
       try {
         const equipment = await query(
           `SELECT id FROM equipment WHERE is_active = TRUE LIMIT 6`
