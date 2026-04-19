@@ -16,10 +16,7 @@ COPY database ./database
 RUN mkdir -p logs && chown -R cmms:cmms /app
 
 USER cmms
-EXPOSE 5000
+EXPOSE 8080
 
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "src/server.js"]
-
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:5000/health || exit 1

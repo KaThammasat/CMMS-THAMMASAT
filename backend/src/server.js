@@ -17,7 +17,7 @@ const logger = require('./utils/logger');
 
 const app = express();
 const server = http.createServer(app);
-const PORT = parseInt(process.env.PORT || '5000');
+const PORT = parseInt(process.env.PORT || "8080");
 
 // DB state
 let dbReady = false;
