@@ -4,7 +4,7 @@
 'use strict';
 
 const express = require('express');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const { body, validationResult } = require('express-validator');
 const { query } = require('../config/database');
 const { generateTokens, authenticate } = require('../middleware/auth');

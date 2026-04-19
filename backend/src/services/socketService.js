@@ -55,7 +55,7 @@ function emitToEquipment(equipmentId, event, data) {
   io.to(`equipment:${equipmentId}`).emit(event, data);
 }
 
-module.exports = { initSocketIO, emitAlert, emitToEquipment };
+// exports merged at bottom
 
 // ─────────────────────────────────────────────────────────────────
 /**
@@ -195,4 +195,4 @@ function startSchedulers(socketIO) {
   logger.info('✅ All schedulers started');
 }
 
-module.exports = { startSchedulers };
+module.exports = { initSocketIO, emitAlert, emitToEquipment, startSchedulers };
