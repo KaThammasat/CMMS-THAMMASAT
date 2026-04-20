@@ -47,7 +47,7 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/adjust', authorize('admin', 'manager', 'technician'), [
-  body('part_id').isUUID('all'),
+  body('part_id').isString().notEmpty(),
   body('quantity').isFloat(),
   body('reason').notEmpty()
 ], async (req, res) => {

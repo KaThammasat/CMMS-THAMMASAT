@@ -63,7 +63,7 @@ router.get('/', async (req, res) => {
 
 // ─── POST /downtime (Start downtime) ───────────────────────────
 router.post('/', [
-  body('equipment_id').isUUID('all'),
+  body('equipment_id').isString().notEmpty(),
   body('type').isIn(['breakdown','planned','setup','idle']),
   body('category').optional().isIn(['electrical','mechanical','hydraulic','pneumatic','software','operator','material','quality']),
   body('description').optional().trim(),
