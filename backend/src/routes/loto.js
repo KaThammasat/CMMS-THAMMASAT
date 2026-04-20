@@ -213,3 +213,26 @@ router.patch('/:id/release', authorize('admin', 'manager'), async (req, res) => 
 });
 
 module.exports = router;
+
+// PATCH /:id/status - Unified status update helper
+router.patch('/:id/status', authorize('admin', 'manager', 'technician'), async (req, res) => {
+  const { status } = req.body;
+  const statusMap = { isolated: 'isolate', verified: 'verify', released: 'release' };
+  const action = statusMap[status];
+  if (!action) return res.status(400).json({ success: false, error: 'Invalid status. Use: isolated, verified, released' });
+  try {
+    const fields = {
+      isolated: 'status=$1, isolated_at=NOW()',
+      verified: 'status=$1, verified_at=NOW(), zero_energy_verified=TRUE',
+      released: 'status=$1, released_at=NOW()'
+    }[status];
+    const result = await query(
+      `UPDATE loto_procedures SET ${fields} WHERE id=$2 RETURNING *`,
+      [status, req.params.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ success: false, error: 'LOTO not found' });
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to update LOTO status' });
+  }
+});
