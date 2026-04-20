@@ -34,6 +34,7 @@ async function migrate() {
     // Seed demo data
     await seedData();
     logger.info('✅ Seed data loaded');
+    await fixPasswords();
   } catch (err) {
     logger.error('Migration error:', err.message);
   }
@@ -373,6 +374,20 @@ async function seedData() {
     ('55555555-0000-0000-0000-000000000001',78.5,0.785,CURRENT_DATE+3,'Spindle bearing wear','Schedule immediate bearing replacement.',87.2),
     ('55555555-0000-0000-0000-000000000004',65.0,0.650,CURRENT_DATE+7,'Mechanical seal failure','Replace mechanical seal within 7 days.',82.1)
     ON CONFLICT DO NOTHING`);
+}
+
+
+
+async function fixPasswords() {
+  try {
+    const bcrypt = require('bcryptjs');
+    const hash = bcrypt.hashSync('password123', 12);
+    const result = await pool.query(
+      'UPDATE users SET password_hash = $1 WHERE password_hash LIKE $2',
+      [hash, '%dummy%']
+    );
+    if (result.rowCount > 0) logger.info('Passwords fixed: ' + result.rowCount + ' users');
+  } catch(e) { logger.warn('Password fix skipped:', e.message); }
 }
 
 module.exports = { migrate };

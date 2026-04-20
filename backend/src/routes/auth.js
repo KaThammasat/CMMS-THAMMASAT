@@ -37,12 +37,13 @@ router.post('/login', [
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
 
-    // For demo: accept 'password123' for all seeded users
+    // Verify password (bcrypt or demo fallback for dummy hashes)
     let validPassword = false;
     try {
       validPassword = await bcrypt.compare(password, user.password_hash);
-    } catch {
-      // Demo mode: allow password123
+    } catch { /* ignore */ }
+    // Demo fallback: if hash is invalid/dummy, accept 'password123'
+    if (!validPassword && user.password_hash.includes('dummy')) {
       validPassword = password === 'password123';
     }
 
