@@ -42,7 +42,7 @@ export default function EquipmentPage() {
       if (filterType) params.type = filterType;
       if (search) params.search = search;
       const res = await equipmentAPI.list(params);
-      setEquipment(res.data || []);
+      setEquipment(res.data?.data || []);
     } catch { toast.error('Failed to load equipment'); }
     finally { setLoading(false); }
   }

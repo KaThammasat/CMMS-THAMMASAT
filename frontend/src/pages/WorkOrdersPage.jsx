@@ -49,7 +49,7 @@ export default function WorkOrdersPage() {
       if (filters.type) params.type = filters.type;
       if (filters.priority) params.priority = filters.priority;
       const res = await workOrderAPI.list(params);
-      setWorkOrders(res.data || []);
+      setWorkOrders(res.data?.data || []);
     } catch (err) {
       toast.error('Failed to load work orders');
     } finally {

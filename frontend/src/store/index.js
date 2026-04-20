@@ -14,7 +14,7 @@ export const useAuthStore = create((set, get) => ({
     set({ isLoading: true });
     try {
       const res = await authAPI.login(email, password);
-      const { accessToken, user } = res.data;
+      const { accessToken, user } = res.data.data || res.data;
       localStorage.setItem('cmms_access_token', accessToken);
       set({ user, token: accessToken, isAuthenticated: true, isLoading: false });
       return { success: true };
@@ -33,7 +33,7 @@ export const useAuthStore = create((set, get) => ({
   fetchMe: async () => {
     try {
       const res = await authAPI.me();
-      set({ user: res.data });
+      set({ user: res.data.data || res.data });
     } catch {
       get().logout();
     }
