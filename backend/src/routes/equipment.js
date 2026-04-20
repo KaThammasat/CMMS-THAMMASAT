@@ -112,7 +112,7 @@ router.post('/', authorize('admin', 'manager'), [
   body('name').notEmpty().trim().withMessage('Name required'),
   body('type').isIn(['cnc','pump','hvac','compressor','motor','conveyor','generator','boiler','crane','robot']),
   body('criticality').isIn(['critical','high','medium','low']),
-  body('location_id').isUUID().withMessage('Valid location ID required'),
+  body('location_id').isUUID('all').withMessage('Valid location ID required'),
   body('cost_per_minute').optional().isFloat({ min: 0 })
 ], async (req, res) => {
   const errors = validationResult(req);

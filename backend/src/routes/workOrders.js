@@ -124,7 +124,7 @@ router.get('/:id', async (req, res) => {
 
 // ─── POST /work-orders ─────────────────────────────────────────
 router.post('/', authorize('admin', 'manager', 'technician'), [
-  body('equipment_id').isUUID(),
+  body('equipment_id').isUUID('all'),
   body('type').isIn(['corrective','preventive','predictive','inspection','project']),
   body('priority').isIn(['critical','high','medium','low']),
   body('title').notEmpty().trim().isLength({ max: 255 }),

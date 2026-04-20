@@ -50,8 +50,8 @@ router.get('/', async (req, res) => {
 
 // ─── POST /loto (Initiate LOTO) ────────────────────────────────
 router.post('/', authorize('admin', 'manager', 'technician'), [
-  body('equipment_id').isUUID(),
-  body('work_order_id').optional().isUUID(),
+  body('equipment_id').isUUID('all'),
+  body('work_order_id').optional().isUUID('all'),
   body('energy_sources').isArray({ min: 1 }).withMessage('At least one energy source required'),
   body('energy_sources.*.type').isIn(['electrical','hydraulic','pneumatic','thermal','gravitational','chemical']),
   body('energy_sources.*.location').notEmpty()
