@@ -1,182 +1,112 @@
-/**
- * Equipment Page - List + AI risk indicators
- */
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { equipmentAPI } from '../utils/api';
-import toast from 'react-hot-toast';
 
-const TYPE_ICONS = { cnc:'⚙', pump:'💧', hvac:'❄', compressor:'💨', motor:'⚡', conveyor:'▶', generator:'⚡', boiler:'🔥', crane:'🏗', robot:'🤖' };
-const CRIT_COLORS = { critical:'#E24B4A', high:'#EF9F27', medium:'#378ADD', low:'#639922' };
-const CRIT_BG = { critical:'#FCEBEB', high:'#FAEEDA', medium:'#E6F1FB', low:'#EAF3DE' };
-
-function HealthBar({ score }) {
-  const color = score >= 80 ? '#639922' : score >= 60 ? '#EF9F27' : '#E24B4A';
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      <div style={{ width: 70, height: 4, background: 'var(--color-background-secondary)', borderRadius: 2, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${score}%`, background: color, borderRadius: 2 }} />
-      </div>
-      <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 500, color }}>{score}</span>
-    </div>
-  );
-}
+const critColor = { critical: 'var(--danger)', high: 'var(--orange)', medium: 'var(--warning)', low: 'var(--success)' };
+const healthColor = s => s >= 80 ? 'var(--success)' : s >= 60 ? 'var(--warning)' : 'var(--danger)';
 
 export default function EquipmentPage() {
   const [equipment, setEquipment] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filterCrit, setFilterCrit] = useState('');
-  const [filterType, setFilterType] = useState('');
-  const navigate = useNavigate();
+  const [crit, setCrit] = useState('');
+  const [type, setType] = useState('');
 
-  useEffect(() => {
-    load();
-  }, [filterCrit, filterType]);
-
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { limit: 100 };
-      if (filterCrit) params.criticality = filterCrit;
-      if (filterType) params.type = filterType;
-      if (search) params.search = search;
-      const res = await equipmentAPI.list(params);
-      setEquipment(res.data?.data || []);
-    } catch { toast.error('Failed to load equipment'); }
+      const r = await equipmentAPI.list({ search: search||undefined, criticality: crit||undefined, type: type||undefined });
+      setEquipment(r.data?.data || []);
+    } catch(e) { console.error(e); }
     finally { setLoading(false); }
-  }
+  }, [search, crit, type]);
 
-  const filtered = search
-    ? equipment.filter(e => e.name.toLowerCase().includes(search.toLowerCase()) || e.asset_code.toLowerCase().includes(search.toLowerCase()))
-    : equipment;
+  useEffect(() => { const t = setTimeout(load, 300); return () => clearTimeout(t); }, [load]);
 
-  const summary = {
-    total: equipment.length,
-    critical: equipment.filter(e => e.criticality === 'critical').length,
-    lowHealth: equipment.filter(e => e.health_score < 60).length,
-    activeDowntime: equipment.filter(e => parseInt(e.active_downtime) > 0).length,
-  };
+  const stats = { total: equipment.length, critical: equipment.filter(e => e.criticality === 'critical').length, alerts: equipment.filter(e => e.health_score < 70).length, downtime: equipment.filter(e => e.active_downtime > 0).length };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <div className="page">
+      <div className="page-header flex justify-between items-center">
         <div>
-          <h1 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Equipment</h1>
-          <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
-            {summary.total} assets · {summary.critical} critical · {summary.lowHealth} health alerts
-          </div>
+          <h1 className="page-title">Equipment</h1>
+          <p className="page-sub">{stats.total} assets · {stats.critical} critical · {stats.alerts} health alerts</p>
         </div>
-        <button
-          onClick={() => navigate('/equipment/new')}
-          style={{ background: '#185FA5', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, cursor: 'pointer', fontWeight: 500 }}
-        >+ Add Equipment</button>
+        <button className="btn btn-primary" onClick={() => {}}>+ Add Equipment</button>
       </div>
 
-      {/* Summary row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+      {/* Stats */}
+      <div className="grid-4 mb-6">
         {[
-          { label: 'Total Assets', value: summary.total },
-          { label: 'Critical Assets', value: summary.critical, color: '#A32D2D' },
-          { label: 'Health Alerts', value: summary.lowHealth, color: '#854F0B' },
-          { label: 'Active Downtime', value: summary.activeDowntime, color: '#A32D2D' },
-        ].map(s => (
-          <div key={s.label} style={{
-            background: 'var(--color-background-primary)',
-            border: '0.5px solid var(--color-border-tertiary)',
-            borderRadius: 8, padding: '10px 14px'
-          }}>
-            <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 4 }}>{s.label}</div>
-            <div style={{ fontSize: 20, fontWeight: 600, color: s.color || 'var(--color-text-primary)' }}>{s.value}</div>
+          { label: 'Total Assets', value: stats.total },
+          { label: 'Critical Assets', value: stats.critical, color: 'var(--danger)' },
+          { label: 'Health Alerts', value: stats.alerts, color: stats.alerts > 0 ? 'var(--warning)' : 'var(--success)' },
+          { label: 'Active Downtime', value: stats.downtime, color: stats.downtime > 0 ? 'var(--danger)' : 'var(--success)' },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="card">
+            <div className="stat-label">{label}</div>
+            <div className="stat-value" style={{ color: color || 'var(--text-primary)' }}>{value}</div>
           </div>
         ))}
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <input
-          placeholder="Search equipment..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && load()}
-          style={{ flex: 1, maxWidth: 280, fontSize: 13, padding: '6px 10px' }}
-        />
-        <select value={filterCrit} onChange={e => setFilterCrit(e.target.value)} style={{ fontSize: 12 }}>
-          <option value="">All Criticality</option>
-          {['critical','high','medium','low'].map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ fontSize: 12 }}>
-          <option value="">All Types</option>
-          {['cnc','pump','hvac','compressor','motor','conveyor','generator'].map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
+      <div className="flex gap-2 mb-4" style={{ flexWrap: 'wrap' }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search equipment..."
+          style={{ flex: 1, minWidth: 200, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', color: 'var(--text-primary)', fontSize: 13 }} />
+        {[['', 'All Criticality'], ['critical','Critical'], ['high','High'], ['medium','Medium'], ['low','Low']].map(([v, l]) => (
+          <button key={v} onClick={() => setCrit(v)} className={`btn btn-${crit===v ? 'primary' : 'secondary'}`} style={{ fontSize: 12, padding: '6px 12px' }}>{l}</button>
+        ))}
       </div>
 
-      {/* Equipment grid */}
+      {/* Equipment Grid */}
       {loading ? (
-        <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-tertiary)' }}>Loading...</div>
+        <div className="grid-2">
+          {[...Array(4)].map((_,i) => <div key={i} className="card"><div className="skeleton" style={{height:120}} /></div>)}
+        </div>
+      ) : equipment.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: 40 }}><p className="text-muted">No equipment found</p></div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
-          {filtered.map(eq => (
-            <div
-              key={eq.id}
-              onClick={() => navigate(`/equipment/${eq.id}`)}
-              style={{
-                background: 'var(--color-background-primary)',
-                border: `0.5px solid ${parseInt(eq.active_downtime) > 0 ? '#E24B4A' : 'var(--color-border-tertiary)'}`,
-                borderRadius: 12, padding: '14px 16px', cursor: 'pointer',
-                transition: 'all 0.12s'
-              }}
-              onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
-              onMouseLeave={e => e.currentTarget.style.transform = ''}
-            >
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: 8,
-                    background: CRIT_BG[eq.criticality],
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 18
-                  }}>{TYPE_ICONS[eq.type] || '⚙'}</div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{eq.name}</div>
-                    <div style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--color-text-tertiary)' }}>{eq.asset_code}</div>
+        <div className="grid-2">
+          {equipment.map(eq => (
+            <Link key={eq.id} to={`/equipment/${eq.id}`} style={{ textDecoration: 'none' }}>
+              <div className="card" style={{ cursor: 'pointer', transition: 'border-color .15s, transform .15s', border: `1px solid ${eq.criticality === 'critical' ? 'rgba(239,68,68,.3)' : 'var(--border)'}` }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = eq.criticality === 'critical' ? 'rgba(239,68,68,.3)' : 'var(--border)'; e.currentTarget.style.transform = ''; }}>
+                <div className="flex justify-between items-center" style={{ marginBottom: 12 }}>
+                  <div className="flex items-center gap-2">
+                    <span style={{ fontSize: 18 }}>{eq.type === 'pump' ? '💧' : eq.type === 'cnc' ? '⚙' : '🔧'}</span>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{eq.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--mono)' }}>{eq.asset_code}</div>
+                    </div>
+                  </div>
+                  <span className={`badge badge-${eq.criticality}`}>{eq.criticality}</span>
+                </div>
+
+                <div className="flex justify-between items-center" style={{ marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Health Score</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: healthColor(eq.health_score) }}>{eq.health_score}%</span>
+                </div>
+                <div className="health-bar" style={{ marginBottom: 12 }}>
+                  <div className="health-bar-fill" style={{ width: `${eq.health_score}%`, background: healthColor(eq.health_score) }} />
+                </div>
+
+                <div className="flex justify-between">
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    {eq.location_name || eq.location_code}
+                  </div>
+                  <div className="flex gap-2">
+                    {eq.open_wo_count > 0 && <span style={{ fontSize: 11, color: 'var(--accent)' }}>📋 {eq.open_wo_count} WO</span>}
+                    {eq.active_downtime > 0 && <span style={{ fontSize: 11, color: 'var(--danger)' }}>● Down</span>}
+                    {eq.risk_score && <span style={{ fontSize: 11, color: 'var(--warning)' }}>Risk: {Math.round(eq.risk_score)}</span>}
                   </div>
                 </div>
-                <span style={{
-                  fontSize: 10, padding: '2px 7px', borderRadius: 6,
-                  background: CRIT_BG[eq.criticality],
-                  color: CRIT_COLORS[eq.criticality],
-                  fontWeight: 500, textTransform: 'capitalize'
-                }}>{eq.criticality}</span>
               </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <HealthBar score={eq.health_score} />
-                {parseInt(eq.active_downtime) > 0 && (
-                  <span style={{ fontSize: 10, color: '#A32D2D', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#E24B4A', animation: 'pulse 1s infinite' }} />
-                    Down
-                  </span>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-                <span>{eq.location_name}</span>
-                {eq.open_wo_count > 0 && (
-                  <span style={{ color: '#854F0B' }}>📋 {eq.open_wo_count} WO</span>
-                )}
-                {eq.risk_score && (
-                  <span style={{ color: eq.risk_score >= 60 ? '#A32D2D' : eq.risk_score >= 30 ? '#854F0B' : '#3B6D11', marginLeft: 'auto' }}>
-                    Risk: {Math.round(eq.risk_score)}
-                  </span>
-                )}
-              </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}
-
-      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }`}</style>
     </div>
   );
 }

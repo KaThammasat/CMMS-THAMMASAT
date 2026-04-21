@@ -1,108 +1,129 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { kpiAPI } from '../utils/api';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-const S = {
-  page: { padding: 24, background: '#0f172a', minHeight: '100%', color: '#f1f5f9' },
-  card: { background: '#1e293b', borderRadius: 8, padding: 20, border: '1px solid #334155' },
-  grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 },
-  grid4: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 20 },
-  val: { fontSize: 28, fontWeight: 700 },
-  sub: { fontSize: 12, color: '#64748b', marginTop: 4 },
+const CustomTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
+      <p style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 4 }}>{label}</p>
+      {payload.map(p => <p key={p.name} style={{ color: p.fill || p.color }}>{p.name}: {p.value}{p.unit || '%'}</p>)}
+    </div>
+  );
 };
 
-const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+function StatCard({ label, value, sub, color }) {
+  return (
+    <div className="card">
+      <div className="stat-label">{label}</div>
+      <div className="stat-value" style={{ color: color || 'var(--text-primary)' }}>{value ?? '—'}</div>
+      {sub && <div className="stat-sub">{sub}</div>}
+    </div>
+  );
+}
 
 export default function KPIPage() {
   const [kpi, setKpi] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState(30);
 
-  useEffect(() => {
-    kpiAPI.summary().then(r => setKpi(r.data?.data)).catch(console.error).finally(() => setLoading(false));
-  }, []);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const from = new Date(Date.now() - range * 86400000).toISOString();
+      const r = await kpiAPI.summary({ from });
+      setKpi(r.data?.data);
+    } catch(e) { console.error(e); }
+    finally { setLoading(false); }
+  }, [range]);
 
-  if (loading) return <div style={S.page}><p style={{ color: '#64748b' }}>Loading KPI data...</p></div>;
+  useEffect(() => { load(); }, [load]);
 
   const oeeData = kpi?.oee ? [
     { name: 'Availability', value: kpi.oee.availability, fill: '#3b82f6' },
-    { name: 'Performance', value: kpi.oee.performance, fill: '#22c55e' },
+    { name: 'Performance', value: kpi.oee.performance, fill: '#10b981' },
     { name: 'Quality', value: kpi.oee.quality, fill: '#8b5cf6' },
     { name: 'OEE', value: kpi.oee.overall, fill: '#f59e0b' },
   ] : [];
 
-  const downtimeByEquipment = kpi?.downtime?.byEquipment || [];
+  const availData = kpi?.equipmentAvailability?.map(e => ({
+    name: e.asset_code, value: Math.min(100, Math.max(0, parseFloat(e.availability_pct) || 0))
+  })) || [];
 
   return (
-    <div style={S.page}>
-      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>📊 KPI Dashboard</h1>
-      <p style={{ fontSize: 12, color: '#64748b', marginBottom: 20 }}>Key Performance Indicators · MTTR · MTBF · OEE</p>
-
-      {/* KPI Cards */}
-      <div style={S.grid4}>
-        {[
-          { label: 'OEE', value: kpi?.oee?.overall ? `${kpi.oee.overall}%` : '--', color: '#22c55e', sub: 'Overall Equipment Effectiveness' },
-          { label: 'MTTR', value: kpi?.mttr?.hours ? `${kpi.mttr.hours}h` : '--', color: '#3b82f6', sub: `${kpi?.mttr?.completedCount || 0} WOs completed` },
-          { label: 'MTBF', value: kpi?.mtbf?.hours ? `${kpi.mtbf.hours}h` : '--', color: '#8b5cf6', sub: `${kpi?.mtbf?.intervals || 0} failure intervals` },
-          { label: 'Downtime Cost', value: kpi?.downtime?.totalCost ? `฿${Number(kpi.downtime.totalCost).toLocaleString()}` : '฿0', color: '#ef4444', sub: `${Math.round((kpi?.downtime?.totalMinutes || 0) / 60)}h total downtime` },
-        ].map(({ label, value, color, sub }) => (
-          <div key={label} style={S.card}>
-            <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 6, fontWeight: 500 }}>{label}</div>
-            <div style={{ ...S.val, color }}>{value}</div>
-            <div style={S.sub}>{sub}</div>
-          </div>
-        ))}
-      </div>
-
-      <div style={S.grid2}>
-        {/* OEE Breakdown Bar Chart */}
-        <div style={S.card}>
-          <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>OEE Components</h3>
-          {oeeData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={oeeData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                <YAxis domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 12 }} unit="%" />
-                <Tooltip formatter={(v) => `${v}%`} contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 6 }} labelStyle={{ color: '#f1f5f9' }} />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                  {oeeData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          ) : <p style={{ color: '#64748b', fontSize: 13 }}>No OEE data available</p>}
+    <div className="page">
+      <div className="page-header flex justify-between items-center">
+        <div>
+          <h1 className="page-title">📊 KPI Dashboard</h1>
+          <p className="page-sub">Key Performance Indicators · MTTR · MTBF · OEE</p>
         </div>
-
-        {/* Equipment Availability */}
-        <div style={S.card}>
-          <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Equipment Availability</h3>
-          {kpi?.equipmentAvailability?.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={kpi.equipmentAvailability} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis type="number" domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 12 }} unit="%" />
-                <YAxis type="category" dataKey="asset_code" tick={{ fill: '#94a3b8', fontSize: 11 }} width={70} />
-                <Tooltip formatter={(v) => `${v}%`} contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 6 }} />
-                <Bar dataKey="availability_pct" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Availability" />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : <p style={{ color: '#64748b', fontSize: 13 }}>No availability data</p>}
+        <div className="flex gap-2">
+          {[7, 30, 90].map(d => (
+            <button key={d} onClick={() => setRange(d)} className={`btn btn-${range===d?'primary':'secondary'}`} style={{ fontSize: 12, padding: '6px 12px' }}>{d}d</button>
+          ))}
         </div>
       </div>
 
-      {/* Downtime Summary */}
-      {kpi?.downtime && (
-        <div style={{ ...S.card, marginTop: 16 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>Downtime Summary</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+      <div className="grid-4 mb-6">
+        {loading ? [...Array(4)].map((_,i) => <div key={i} className="card"><div className="skeleton" style={{height:14,marginBottom:10}} /><div className="skeleton" style={{height:32}} /></div>) : <>
+          <StatCard label="OEE" value={kpi?.oee?.overall ? `${kpi.oee.overall}%` : '—'} sub="Overall Equipment Effectiveness" color="var(--success)" />
+          <StatCard label="MTTR" value={kpi?.mttr?.hours ? `${kpi.mttr.hours}h` : '—'} sub={`${kpi?.mttr?.completedCount || 0} corrective WOs`} color="var(--accent)" />
+          <StatCard label="MTBF" value={kpi?.mtbf?.hours ? `${kpi.mtbf.hours}h` : '—'} sub={`${kpi?.mtbf?.failureCount || 0} failure intervals`} color="var(--purple)" />
+          <StatCard label="Downtime Cost" value={kpi?.downtime?.totalCost ? `฿${Number(kpi.downtime.totalCost).toLocaleString()}` : '฿0'} sub={`${Math.round((kpi?.downtime?.totalMinutes||0)/60)}h total`} color="var(--danger)" />
+        </>}
+      </div>
+
+      <div className="grid-2 mb-4">
+        <div className="card">
+          <div className="section-title">OEE Components</div>
+          {loading ? <div className="skeleton" style={{height:220}} /> :
+            oeeData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={oeeData} barSize={40}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0,100]} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} unit="%" axisLine={false} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="value" radius={[6,6,0,0]} name="Value">
+                    {oeeData.map((e,i) => <Cell key={i} fill={e.fill} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : <p className="text-muted" style={{fontSize:13}}>No OEE data</p>
+          }
+        </div>
+
+        <div className="card">
+          <div className="section-title">Equipment Availability</div>
+          {loading ? <div className="skeleton" style={{height:220}} /> :
+            availData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={availData} layout="vertical" barSize={18}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                  <XAxis type="number" domain={[0,100]} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} unit="%" axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} width={72} axisLine={false} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="value" fill="var(--accent)" radius={[0,6,6,0]} name="Availability" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : <p className="text-muted" style={{fontSize:13}}>No availability data</p>
+          }
+        </div>
+      </div>
+
+      {kpi && (
+        <div className="card">
+          <div className="section-title">Work Order Summary</div>
+          <div className="grid-4">
             {[
-              { label: 'Total Events', value: kpi.downtime.totalEvents || 0 },
-              { label: 'Breakdowns', value: kpi.downtime.breakdowns || 0 },
-              { label: 'Total Minutes', value: Math.round(kpi.downtime.totalMinutes || 0) },
-              { label: 'Avg Duration', value: kpi.downtime.avgDuration ? `${Math.round(kpi.downtime.avgDuration)}min` : '-' },
-            ].map(({ label, value }) => (
-              <div key={label} style={{ textAlign: 'center', padding: '12px', background: '#0f172a', borderRadius: 6 }}>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#f1f5f9' }}>{value}</div>
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>{label}</div>
+              { label: 'Total WOs', value: kpi.workOrders?.total || 0 },
+              { label: 'Open', value: kpi.workOrders?.open_count || 0, color: 'var(--accent)' },
+              { label: 'Completed', value: kpi.workOrders?.completed_count || 0, color: 'var(--success)' },
+              { label: 'SLA Breached', value: kpi.workOrders?.sla_breached_count || 0, color: 'var(--danger)' },
+            ].map(({ label, value, color }) => (
+              <div key={label} style={{ textAlign: 'center', padding: '16px', background: 'var(--bg-base)', borderRadius: 8 }}>
+                <div style={{ fontSize: 26, fontWeight: 700, color: color || 'var(--text-primary)' }}>{value}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{label}</div>
               </div>
             ))}
           </div>

@@ -2,6 +2,7 @@
  * CMMS Thammasat - Main App
  * React 18 + React Router v6
  */
+import './index.css';
 import React, { useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';

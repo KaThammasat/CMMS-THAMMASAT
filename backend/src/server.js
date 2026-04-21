@@ -10,6 +10,7 @@ const { Server: SocketIO } = require('socket.io');
 const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+const compression = require('compression');
 const dotenv = require('dotenv');
 dotenv.config();
 
@@ -30,11 +31,15 @@ const io = new SocketIO(server, {
 app.set('io', io);
 
 // ─── Middleware ───────────────────────────────────────────────
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(compression({ level: 6, threshold: 1024 }));
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
 app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true,
   methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'] }));
-app.use('/api/', rateLimit({ windowMs: 15*60*1000, max: 500,
-  message: { success: false, error: 'Too many requests' } }));
+// Rate limiting - tiered
+const apiLimiter = rateLimit({ windowMs: 15*60*1000, max: 300, standardHeaders: true, legacyHeaders: false, message: { success: false, error: 'Rate limit exceeded. Try again later.' } });
+const authLimiter = rateLimit({ windowMs: 15*60*1000, max: 20, standardHeaders: true, legacyHeaders: false, message: { success: false, error: 'Too many login attempts.' } });
+app.use('/api/', apiLimiter);
+app.use('/api/v1/auth/login', authLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
