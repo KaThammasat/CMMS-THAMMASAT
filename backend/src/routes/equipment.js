@@ -219,7 +219,22 @@ router.get('/:id/predict', async (req, res) => {
        JSON.stringify(prediction.inputFeatures)]
     );
 
-    res.json({ success: true, data: prediction });
+    // Normalize camelCase to snake_case for API consistency
+    const p = prediction;
+    res.json({ success: true, data: {
+      equipment_id: p.equipmentId,
+      asset_code: p.assetCode,
+      risk_score: p.riskScore,
+      failure_probability: p.failureProbability,
+      estimated_failure_date: p.estimatedFailureDate,
+      days_to_failure: p.daysToFailure,
+      failure_mode: p.failureMode,
+      recommendation: p.recommendation,
+      confidence_level: p.confidenceLevel,
+      model_version: p.modelVersion,
+      analyzed_at: p.analyzedAt,
+      input_features: p.inputFeatures,
+    }});
   } catch (err) {
     logger.error('Prediction error:', err);
     res.status(500).json({ success: false, error: 'Failed to generate prediction' });
