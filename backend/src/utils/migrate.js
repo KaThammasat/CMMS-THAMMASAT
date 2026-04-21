@@ -155,6 +155,8 @@ async function seedRichData() {
       ON CONFLICT DO NOTHING
     `);
 
+    // Close stale open downtime records older than 10 minutes (from testing)
+    await pool.query(`UPDATE downtime_records SET end_time=NOW(), duration_minutes=EXTRACT(EPOCH FROM (NOW()-start_time))/60 WHERE end_time IS NULL AND start_time < NOW()-INTERVAL '10 minutes'`).catch(()=>{});
     logger.info('✅ Rich seed data loaded (WOs, downtime, inventory, alerts, LOTO, sensors)');
   } catch(e) { logger.error('Rich seed error:', e.message); }
 }
