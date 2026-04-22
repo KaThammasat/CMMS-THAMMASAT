@@ -217,6 +217,13 @@ function getSchemaStatements() {
     `CREATE INDEX IF NOT EXISTS idx_downtime_equipment ON downtime_records(equipment_id)`,
     `CREATE INDEX IF NOT EXISTS idx_alerts_unread ON alerts(is_read,created_at DESC)`,
     `CREATE INDEX IF NOT EXISTS idx_sensor_equipment_time ON sensor_readings(equipment_id,recorded_at DESC)`,
+    // Admin: Audit Log
+    `CREATE TABLE IF NOT EXISTS audit_log (id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), actor_id UUID REFERENCES users(id) ON DELETE SET NULL, action VARCHAR(100) NOT NULL, entity_type VARCHAR(50), entity_id UUID, before_data JSONB, after_data JSONB, ip_address VARCHAR(45), user_agent VARCHAR(200), created_at TIMESTAMPTZ DEFAULT NOW())`,
+    `CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log(actor_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action)`,
+    `CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC)`,
+    // Admin: System Config
+    `CREATE TABLE IF NOT EXISTS system_config (key VARCHAR(100) PRIMARY KEY, value TEXT NOT NULL, description TEXT, updated_by UUID REFERENCES users(id) ON DELETE SET NULL, updated_at TIMESTAMPTZ DEFAULT NOW())`,
   ];
 }
 
