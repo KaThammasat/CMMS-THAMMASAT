@@ -53,6 +53,7 @@ function AppRoutes() {
           <Route path="inventory"       element={<InventoryPage />} />
           <Route path="kpi"             element={<KPIPage />} />
           <Route path="loto"            element={<LotoPage />} />
+          <Route path="admin"           element={<AdminPage />} />
         </Route>
         <Route path="/login" element={<LoginPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
