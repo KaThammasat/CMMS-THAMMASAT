@@ -8,7 +8,35 @@ async function migrate() {
       "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name='equipment') as exists"
     );
     if (check.rows[0].exists) {
-      logger.info('DB schema already initialized');
+      logger.info('DB schema exists — applying incremental migrations...');
+      const newTables = [
+        `CREATE TABLE IF NOT EXISTS audit_log (id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), actor_id UUID REFERENCES users(id) ON DELETE SET NULL, action VARCHAR(100) NOT NULL, entity_type VARCHAR(50), entity_id UUID, before_data JSONB, after_data JSONB, ip_address VARCHAR(45), user_agent VARCHAR(200), created_at TIMESTAMPTZ DEFAULT NOW())`,
+        `CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log(actor_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action)`,
+        `CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC)`,
+        `CREATE TABLE IF NOT EXISTS system_config (key VARCHAR(100) PRIMARY KEY, value TEXT NOT NULL, description TEXT, updated_by UUID REFERENCES users(id) ON DELETE SET NULL, updated_at TIMESTAMPTZ DEFAULT NOW())`,
+      ];
+      for (const sql of newTables) {
+        try { await pool.query(sql); } catch(e) { logger.warn('Incr migration skipped: '+e.message.split('\n')[0]); }
+      }
+      const cfgCount = await pool.query('SELECT COUNT(*) FROM system_config');
+      if (+cfgCount.rows[0].count === 0) {
+        await pool.query(`INSERT INTO system_config(key,value,description) VALUES
+          ('sla_critical_hours','4','SLA hours for critical priority WOs'),
+          ('sla_high_hours','8','SLA hours for high priority WOs'),
+          ('sla_medium_hours','24','SLA hours for medium priority WOs'),
+          ('sla_low_hours','72','SLA hours for low priority WOs'),
+          ('max_login_attempts','5','Max failed login attempts'),
+          ('session_timeout_hours','24','JWT session timeout in hours'),
+          ('oee_target','85','Target OEE percentage'),
+          ('mttr_target_hours','4','Target MTTR in hours'),
+          ('pm_advance_days','7','Days ahead to generate PM WOs'),
+          ('cost_per_downtime_hour','5000','Cost per downtime hour THB'),
+          ('alert_email_enabled','false','Send alert emails'),
+          ('maintenance_mode','false','Maintenance mode')
+        `);
+        logger.info('System config seeded');
+      }
       await fixPasswords();
       await seedRichData();
       return;
