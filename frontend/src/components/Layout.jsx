@@ -10,6 +10,7 @@ const nav = [
   { path: '/loto', label: 'LOTO Safety', icon: '🔒', section: 'OPERATIONS' },
   { path: '/inventory', label: 'Inventory', icon: '📦', section: 'OPERATIONS' },
   { path: '/kpi', label: 'KPI Reports', icon: '📊', section: 'ANALYTICS' },
+  { path: '/admin', label: 'Admin Settings', icon: '🛠', section: 'ADMIN' },
 ];
 
 export default function Layout() {

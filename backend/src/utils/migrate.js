@@ -157,6 +157,27 @@ async function seedRichData() {
 
     // Close stale open downtime records older than 10 minutes (from testing)
     await pool.query(`UPDATE downtime_records SET end_time=NOW(), duration_minutes=EXTRACT(EPOCH FROM (NOW()-start_time))/60 WHERE end_time IS NULL AND start_time < NOW()-INTERVAL '10 minutes'`).catch(()=>{});
+
+  // Seed system config defaults
+  const cfgExists = await pool.query("SELECT COUNT(*) FROM system_config");
+  if (+cfgExists.rows[0].count === 0) {
+    await pool.query(`INSERT INTO system_config(key,value,description) VALUES
+      ('sla_critical_hours','4','SLA hours for critical priority WOs'),
+      ('sla_high_hours','8','SLA hours for high priority WOs'),
+      ('sla_medium_hours','24','SLA hours for medium priority WOs'),
+      ('sla_low_hours','72','SLA hours for low priority WOs'),
+      ('max_login_attempts','5','Max failed login attempts before lockout'),
+      ('session_timeout_hours','24','JWT session timeout in hours'),
+      ('oee_target','85','Target OEE percentage'),
+      ('mttr_target_hours','4','Target MTTR in hours'),
+      ('pm_advance_days','7','Days in advance to generate PM work orders'),
+      ('cost_per_downtime_hour','5000','Default cost per hour of downtime in THB'),
+      ('alert_email_enabled','false','Send alert emails'),
+      ('maintenance_mode','false','Put system in maintenance mode')
+    `);
+    logger.info('✅ System config seeded');
+  }
+
     logger.info('✅ Rich seed data loaded (WOs, downtime, inventory, alerts, LOTO, sensors)');
   } catch(e) { logger.error('Rich seed error:', e.message); }
 }

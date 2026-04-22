@@ -19,6 +19,7 @@ const WorkOrdersPage  = lazy(() => import('./pages/WorkOrdersPage'));
 const WorkOrderDetail = lazy(() => import('./pages/WorkOrderDetail'));
 const DowntimePage    = lazy(() => import('./pages/DowntimePage'));
 const InventoryPage   = lazy(() => import('./pages/InventoryPage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
 const KPIPage         = lazy(() => import('./pages/KPIPage'));
 const LotoPage        = lazy(() => import('./pages/LotoPage'));
 
