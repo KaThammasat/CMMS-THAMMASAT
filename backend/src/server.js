@@ -76,6 +76,7 @@ app.use('/api/', (req, res, next) => {
 });
 
 // ─── Routes ───────────────────────────────────────────────────
+app.use('/api/v1/public',       require('./routes/public'));
 app.use('/api/v1/auth',        require('./routes/auth'));
 app.use('/api/v1/equipment',   require('./routes/equipment'));
 app.use('/api/v1/work-orders', require('./routes/workOrders'));

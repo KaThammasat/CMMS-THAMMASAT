@@ -15,6 +15,12 @@ async function migrate() {
         `CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action)`,
         `CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC)`,
         `CREATE TABLE IF NOT EXISTS system_config (key VARCHAR(100) PRIMARY KEY, value TEXT NOT NULL, description TEXT, updated_by UUID REFERENCES users(id) ON DELETE SET NULL, updated_at TIMESTAMPTZ DEFAULT NOW())`,
+    `CREATE TABLE IF NOT EXISTS repair_requests (id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), ticket_number VARCHAR(20) UNIQUE NOT NULL, requester_name VARCHAR(100) NOT NULL, requester_phone VARCHAR(30), requester_email VARCHAR(150), location VARCHAR(200) NOT NULL, equipment_description VARCHAR(200) NOT NULL, problem_description TEXT NOT NULL, urgency VARCHAR(20) NOT NULL DEFAULT 'normal', status VARCHAR(20) NOT NULL DEFAULT 'pending', assigned_to UUID REFERENCES users(id) ON DELETE SET NULL, work_order_id UUID REFERENCES work_orders(id) ON DELETE SET NULL, admin_notes TEXT, resolved_at TIMESTAMPTZ, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`,
+    `CREATE INDEX IF NOT EXISTS idx_repair_status ON repair_requests(status)`,
+    `CREATE INDEX IF NOT EXISTS idx_repair_created ON repair_requests(created_at DESC)`,
+        `CREATE TABLE IF NOT EXISTS repair_requests (id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), ticket_number VARCHAR(20) UNIQUE NOT NULL, requester_name VARCHAR(100) NOT NULL, requester_phone VARCHAR(30), requester_email VARCHAR(150), location VARCHAR(200) NOT NULL, equipment_description VARCHAR(200) NOT NULL, problem_description TEXT NOT NULL, urgency VARCHAR(20) NOT NULL DEFAULT 'normal', status VARCHAR(20) NOT NULL DEFAULT 'pending', assigned_to UUID REFERENCES users(id) ON DELETE SET NULL, work_order_id UUID REFERENCES work_orders(id) ON DELETE SET NULL, admin_notes TEXT, resolved_at TIMESTAMPTZ, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`,
+        `CREATE INDEX IF NOT EXISTS idx_repair_status ON repair_requests(status)`,
+        `CREATE INDEX IF NOT EXISTS idx_repair_created ON repair_requests(created_at DESC)`,
       ];
       for (const sql of newTables) {
         try { await pool.query(sql); } catch(e) { logger.warn('Incr migration skipped: '+e.message.split('\n')[0]); }

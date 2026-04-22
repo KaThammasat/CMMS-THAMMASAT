@@ -19,6 +19,7 @@ const WorkOrdersPage  = lazy(() => import('./pages/WorkOrdersPage'));
 const WorkOrderDetail = lazy(() => import('./pages/WorkOrderDetail'));
 const DowntimePage    = lazy(() => import('./pages/DowntimePage'));
 const InventoryPage   = lazy(() => import('./pages/InventoryPage'));
+const PublicRepairPage = lazy(() => import('./pages/PublicRepairPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
 const KPIPage         = lazy(() => import('./pages/KPIPage'));
 const LotoPage        = lazy(() => import('./pages/LotoPage'));
@@ -55,6 +56,7 @@ function AppRoutes() {
           <Route path="loto"            element={<LotoPage />} />
           <Route path="admin"           element={<AdminPage />} />
         </Route>
+        <Route path="/repair" element={<PublicRepairPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

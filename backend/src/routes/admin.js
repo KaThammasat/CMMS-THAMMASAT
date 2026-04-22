@@ -220,3 +220,41 @@ router.delete('/users/:id/sessions', async (req,res) => {
 });
 
 module.exports = router;
+
+// ── REPAIR REQUESTS (admin management) ──────────────────────────
+// GET /api/v1/admin/repair-requests
+router.get('/repair-requests', async (req,res) => {
+  try {
+    const { status='', urgency='', page=1, limit=50 } = req.query;
+    const offset=(page-1)*limit, conds=['1=1'], vals=[];
+    if(status){vals.push(status);conds.push(`r.status=$${vals.length}`);}
+    if(urgency){vals.push(urgency);conds.push(`r.urgency=$${vals.length}`);}
+    const where=conds.join(' AND ');
+    const[{rows},{rows:cnt}]=await Promise.all([
+      pool.query(`SELECT r.*,u.first_name||' '||u.last_name as assigned_name FROM repair_requests r LEFT JOIN users u ON u.id=r.assigned_to WHERE ${where} ORDER BY r.created_at DESC LIMIT $${vals.length+1} OFFSET $${vals.length+2}`,[...vals,limit,offset]),
+      pool.query(`SELECT COUNT(*) FROM repair_requests r WHERE ${where}`,vals)
+    ]);
+    // Stats
+    const{rows:stats}=await pool.query(`SELECT status,COUNT(*) as count FROM repair_requests GROUP BY status`);
+    res.json({success:true,data:rows,pagination:{total:+cnt[0].count,page:+page,limit:+limit},stats:Object.fromEntries(stats.map(s=>[s.status,+s.count]))});
+  }catch(e){res.status(500).json({success:false,error:e.message});}
+});
+
+// PATCH /api/v1/admin/repair-requests/:id
+router.patch('/repair-requests/:id', async (req,res) => {
+  try {
+    const{status,admin_notes,assigned_to}=req.body;
+    const sets=[],vals=[];
+    if(status){vals.push(status);sets.push(`status=$${vals.length}`);
+      if(status==='resolved'){sets.push(`resolved_at=NOW()`);}
+    }
+    if(admin_notes!==undefined){vals.push(admin_notes);sets.push(`admin_notes=$${vals.length}`);}
+    if(assigned_to!==undefined){vals.push(assigned_to||null);sets.push(`assigned_to=$${vals.length}`);}
+    if(!sets.length)return res.status(400).json({success:false,error:'No fields to update'});
+    vals.push(req.params.id);
+    const{rows}=await pool.query(`UPDATE repair_requests SET ${sets.join(',')},updated_at=NOW() WHERE id=$${vals.length} RETURNING *`,vals);
+    if(!rows[0])return res.status(404).json({success:false,error:'Request not found'});
+    await audit(req.user.id,'UPDATE_REPAIR_REQUEST','repair_request',req.params.id,null,{status,admin_notes},req);
+    res.json({success:true,data:rows[0]});
+  }catch(e){res.status(500).json({success:false,error:e.message});}
+});

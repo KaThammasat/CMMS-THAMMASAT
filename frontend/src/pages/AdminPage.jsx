@@ -387,12 +387,114 @@ function SecurityTab(){
   </div>);
 }
 
+
+// ── Repair Requests Tab ──────────────────────────────────────────
+function RepairTab(){
+  const[requests,setRequests]=useState([]);
+  const[stats,setStats]=useState({});
+  const[loading,setLoading]=useState(true);
+  const[statusFilter,setStatusFilter]=useState('');
+  const[urgencyFilter,setUrgencyFilter]=useState('');
+  const[selected,setSelected]=useState(null);
+  const[noteForm,setNoteForm]=useState({status:'',admin_notes:''});
+  const[saving,setSaving]=useState(false);
+  const tok=typeof localStorage!=='undefined'?localStorage.getItem('cmms_access_token'):'';
+
+  const load=useCallback(async()=>{
+    setLoading(true);
+    try{const r=await api.get('/admin/repair-requests',{params:{status:statusFilter||undefined,urgency:urgencyFilter||undefined,limit:100}});setRequests(r.data?.data||[]);setStats(r.data?.stats||{});}
+    catch(e){console.error(e);}finally{setLoading(false);}
+  },[statusFilter,urgencyFilter]);
+
+  useEffect(()=>{load();},[load]);
+
+  const openDetail=(r)=>{setSelected(r);setNoteForm({status:r.status,admin_notes:r.admin_notes||''});};
+
+  const save=async()=>{
+    if(!selected)return;setSaving(true);
+    try{await api.patch('/admin/repair-requests/'+selected.id,noteForm);setSelected(null);load();}
+    catch(e){alert(e.response?.data?.error||e.message);}finally{setSaving(false);}
+  };
+
+  const urgColor={low:'var(--success)',normal:'var(--warning)',high:'var(--orange)',critical:'var(--danger)'};
+  const stColor={pending:'var(--warning)',in_progress:'var(--accent)',resolved:'var(--success)',cancelled:'var(--text-muted)'};
+  const fmtDate=d=>d?new Date(d).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}):'—';
+
+  return(<div>
+    {/* Stats */}
+    <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:12,marginBottom:20}}>
+      {[{l:'Total',v:(requests.length),c:'var(--text-primary)'},{l:'Pending',v:stats.pending||0,c:'var(--warning)'},{l:'In Progress',v:stats.in_progress||0,c:'var(--accent)'},{l:'Resolved',v:stats.resolved||0,c:'var(--success)'},{l:'Cancelled',v:stats.cancelled||0,c:'var(--text-muted)'}].map(({l,v,c})=>(
+        <div key={l} className="card-sm"style={{textAlign:'center'}}><div style={{fontSize:10,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:.5,marginBottom:4}}>{l}</div><div style={{fontSize:22,fontWeight:700,color:c}}>{v}</div></div>
+      ))}
+    </div>
+
+    {/* Filters */}
+    <div className="flex gap-2 mb-4">
+      {['','pending','in_progress','resolved','cancelled'].map(s=>(
+        <button key={s}onClick={()=>setStatusFilter(s)}className={`btn btn-${statusFilter===s?'primary':'secondary'}`}style={{fontSize:12,padding:'6px 12px'}}>{s||'All Status'}</button>
+      ))}
+      <select value={urgencyFilter}onChange={e=>setUrgencyFilter(e.target.value)}style={{background:'var(--bg-surface)',border:'1px solid var(--border)',borderRadius:6,padding:'7px 10px',color:'var(--text-primary)',fontSize:13,marginLeft:'auto'}}>
+        <option value="">All Urgency</option>
+        {['low','normal','high','critical'].map(u=><option key={u}value={u}>{u}</option>)}
+      </select>
+      <a href="/repair"target="_blank"className="btn btn-secondary"style={{fontSize:12}}>🔗 Public Form</a>
+    </div>
+
+    {/* Table */}
+    <div className="table-wrapper">
+      <table><thead><tr><th>Ticket</th><th>Requester</th><th>Location</th><th>Equipment</th><th>Urgency</th><th>Status</th><th>Submitted</th><th>Action</th></tr></thead>
+      <tbody>
+        {loading?[...Array(5)].map((_,i)=><tr key={i}>{[...Array(8)].map((_,j)=><td key={j}><div className="skeleton"style={{height:16}}/></td>)}</tr>):
+        requests.length===0?<tr><td colSpan={8}style={{textAlign:'center',color:'var(--text-muted)',padding:32}}>No repair requests</td></tr>:
+        requests.map(r=><tr key={r.id}>
+          <td className="mono"style={{color:'var(--accent)',fontSize:12}}>{r.ticket_number}</td>
+          <td><div style={{fontWeight:500,color:'var(--text-primary)',fontSize:13}}>{r.requester_name}</div><div style={{fontSize:11,color:'var(--text-muted)'}}>{r.requester_phone||r.requester_email||''}</div></td>
+          <td style={{fontSize:13,maxWidth:120,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.location}</td>
+          <td style={{fontSize:13,maxWidth:120,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.equipment_description}</td>
+          <td><span style={{fontSize:11,fontWeight:700,color:urgColor[r.urgency]||'var(--text-muted)',textTransform:'uppercase'}}>{r.urgency}</span></td>
+          <td><span className={`badge badge-${r.status==='in_progress'?'in_progress':r.status==='resolved'?'completed':r.status==='cancelled'?'pending':'medium'}`}style={{color:stColor[r.status]}}>{r.status?.replace('_',' ')}</span></td>
+          <td style={{fontSize:12,color:'var(--text-muted)'}}>{fmtDate(r.created_at)}</td>
+          <td><button onClick={()=>openDetail(r)}className="btn btn-secondary"style={{padding:'4px 10px',fontSize:11}}>Manage</button></td>
+        </tr>)}
+      </tbody></table>
+    </div>
+
+    {/* Detail Modal */}
+    {selected&&<Modal title={selected.ticket_number+' — Repair Request'}onClose={()=>setSelected(null)}width={560}>
+      <div style={{display:'grid',gap:8,marginBottom:16}}>
+        {[['Requester',selected.requester_name+(selected.requester_phone?' · '+selected.requester_phone:'')],['Email',selected.requester_email||'—'],['Location',selected.location],['Equipment',selected.equipment_description],['Submitted',fmtDate(selected.created_at)]].map(([l,v])=>(
+          <div key={l}style={{display:'flex',gap:12,padding:'6px 0',borderBottom:'1px solid var(--border)',fontSize:13}}>
+            <span style={{color:'var(--text-muted)',minWidth:90}}>{l}</span>
+            <span style={{color:'var(--text-secondary)'}}>{v}</span>
+          </div>
+        ))}
+        <div style={{padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+          <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:4}}>PROBLEM DESCRIPTION</div>
+          <div style={{fontSize:13,color:'var(--text-primary)',lineHeight:1.6}}>{selected.problem_description}</div>
+        </div>
+      </div>
+      <Field label="Status"value={noteForm.status}onChange={v=>setNoteForm({...noteForm,status:v})}options={['pending','in_progress','resolved','cancelled'].map(s=>({value:s,label:s.replace('_',' ')}))}/>
+      <div style={{marginBottom:16}}>
+        <label style={{fontSize:12,color:'var(--text-muted)',display:'block',marginBottom:4,fontWeight:600,textTransform:'uppercase',letterSpacing:.4}}>Technician Notes (visible to requester)</label>
+        <textarea value={noteForm.admin_notes}onChange={e=>setNoteForm({...noteForm,admin_notes:e.target.value})}
+          style={{width:'100%',background:'var(--bg-base)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 10px',color:'var(--text-primary)',fontSize:13,minHeight:80,resize:'vertical',fontFamily:'inherit',boxSizing:'border-box'}}
+          placeholder="Add notes for the requester..."/>
+      </div>
+      <div className="flex gap-2 justify-between">
+        <button onClick={()=>setSelected(null)}className="btn btn-secondary">Cancel</button>
+        <button onClick={save}disabled={saving}className="btn btn-primary">{saving?'Saving...':'Save Changes'}</button>
+      </div>
+    </Modal>}
+  </div>);
+}
+
 // ── Main Admin Page ──────────────────────────────────────────────
 const TABS=[
   {id:'users',label:'👥 Users',component:UsersTab},
   {id:'config',label:'⚙ System Config',component:ConfigTab},
   {id:'security',label:'🛡 Security & Stats',component:SecurityTab},
   {id:'audit',label:'📋 Audit Log',component:AuditTab},
+  {id:'repair',label:'🔧 Repair Requests',component:RepairTab},
 ];
 
 export default function AdminPage(){
