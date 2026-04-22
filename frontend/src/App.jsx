@@ -19,6 +19,7 @@ const WorkOrdersPage  = lazy(() => import('./pages/WorkOrdersPage'));
 const WorkOrderDetail = lazy(() => import('./pages/WorkOrderDetail'));
 const DowntimePage    = lazy(() => import('./pages/DowntimePage'));
 const InventoryPage   = lazy(() => import('./pages/InventoryPage'));
+const PMPage = lazy(() => import('./pages/PMPage'));
 const PublicRepairPage = lazy(() => import('./pages/PublicRepairPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
 const KPIPage         = lazy(() => import('./pages/KPIPage'));
@@ -54,6 +55,7 @@ function AppRoutes() {
           <Route path="inventory"       element={<InventoryPage />} />
           <Route path="kpi"             element={<KPIPage />} />
           <Route path="loto"            element={<LotoPage />} />
+          <Route path="pm"              element={<PMPage />} />
           <Route path="admin"           element={<AdminPage />} />
         </Route>
         <Route path="/repair" element={<PublicRepairPage />} />

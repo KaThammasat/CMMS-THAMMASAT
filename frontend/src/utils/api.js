@@ -37,6 +37,7 @@ export const authAPI = {
 // Equipment API
 export const equipmentAPI = {
   list: (params) => api.get('/equipment', { params }),
+  create: (data) => api.post('/equipment', data),
   get: (id) => api.get(`/equipment/${id}`),
   update: (id, data) => api.patch(`/equipment/${id}`, data),
   predict: (id) => api.get(`/equipment/${id}/predict`),
@@ -92,3 +93,13 @@ export const reportsAPI = {
 };
 
 export default api;
+
+// PM API
+export const pmAPI = {
+  list: (params) => api.get('/pm', { params }),
+  get: (id) => api.get(`/pm/${id}`),
+  create: (data) => api.post('/pm', data),
+  update: (id, data) => api.patch(`/pm/${id}`, data),
+  complete: (id, data) => api.post(`/pm/${id}/complete`, data),
+  deactivate: (id) => api.delete(`/pm/${id}`),
+};

@@ -86,6 +86,7 @@ app.use('/api/v1/reports',     require('./routes/reports'));
 app.use('/api/v1/loto',        require('./routes/loto'));
 app.use('/api/v1/alerts',      require('./routes/alerts'));
 app.use('/api/v1/kpi',         require('./routes/kpi'));
+app.use('/api/v1/pm',           require('./routes/pm'));
 app.use('/api/v1/admin',        require('./routes/admin'));
 
 app.use((req, res) => res.status(404).json({ success: false, error: `${req.originalUrl} not found` }));
