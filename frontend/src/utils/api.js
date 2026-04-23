@@ -102,4 +102,5 @@ export const pmAPI = {
   update: (id, data) => api.patch(`/pm/${id}`, data),
   complete: (id, data) => api.post(`/pm/${id}/complete`, data),
   deactivate: (id) => api.delete(`/pm/${id}`),
+  delete: (id) => api.delete(`/pm/${id}`),
 };

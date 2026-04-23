@@ -1,38 +1,44 @@
 /**
- * PM (Preventive Maintenance) Routes
+ * Preventive Maintenance (PM) Routes
  */
 const router = require('express').Router();
 const { body, validationResult } = require('express-validator');
 const { pool } = require('../config/database');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth');
 
 router.use(authenticate);
 
-// GET /api/v1/pm — list all PM schedules
-router.get('/', async (req, res) => {
+// GET /api/v1/pm
+router.get('/', async (req,res) => {
   try {
-    const { equipment_id, due_within_days, is_active } = req.query;
+    const { equipment_id, is_active, due_within_days } = req.query;
     const conds = ['1=1'], vals = [];
     if (equipment_id) { vals.push(equipment_id); conds.push(`p.equipment_id=$${vals.length}`); }
     if (is_active !== undefined) { vals.push(is_active !== 'false'); conds.push(`p.is_active=$${vals.length}`); }
-    if (due_within_days) {
-      vals.push(parseInt(due_within_days));
-      conds.push(`p.next_due_date <= CURRENT_DATE + ($${vals.length} || ' days')::INTERVAL`);
-    }
+    if (due_within_days) { vals.push(parseInt(due_within_days)); conds.push(`p.next_due_date <= NOW() + INTERVAL '1 day' * $${vals.length}`); }
     const { rows } = await pool.query(
-      `SELECT p.*,e.name as equipment_name,e.asset_code,e.criticality,
-              CASE WHEN p.next_due_date < CURRENT_DATE THEN 'overdue'
-                   WHEN p.next_due_date <= CURRENT_DATE+7 THEN 'due_soon'
-                   ELSE 'ok' END as status
-       FROM pm_schedules p JOIN equipment e ON e.id=p.equipment_id
-       WHERE ${conds.join(' AND ')} ORDER BY p.next_due_date ASC NULLS LAST`, vals
+      `SELECT p.*,e.name as equipment_name,e.asset_code,e.location_id,
+        l.name as location_name,
+        CASE WHEN p.next_due_date < NOW() THEN 'overdue'
+             WHEN p.next_due_date < NOW()+INTERVAL '7 days' THEN 'due_soon'
+             ELSE 'ok' END as due_status,
+        EXTRACT(DAY FROM p.next_due_date - NOW())::int as days_until_due
+       FROM pm_schedules p
+       JOIN equipment e ON e.id=p.equipment_id
+       LEFT JOIN locations l ON l.id=e.location_id
+       WHERE ${conds.join(' AND ')}
+       ORDER BY p.next_due_date ASC`,
+      vals
     );
-    res.json({ success: true, data: rows });
+    // Stats
+    const overdue = rows.filter(r=>r.due_status==='overdue').length;
+    const dueSoon = rows.filter(r=>r.due_status==='due_soon').length;
+    res.json({ success:true, data:rows, stats:{ total:rows.length, overdue, due_soon:dueSoon, ok:rows.length-overdue-dueSoon } });
   } catch(e) { res.status(500).json({ success:false, error:e.message }); }
 });
 
 // GET /api/v1/pm/:id
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req,res) => {
   try {
     const { rows } = await pool.query(
       `SELECT p.*,e.name as equipment_name,e.asset_code FROM pm_schedules p JOIN equipment e ON e.id=p.equipment_id WHERE p.id=$1`,
@@ -43,101 +49,83 @@ router.get('/:id', async (req, res) => {
   } catch(e) { res.status(500).json({ success:false, error:e.message }); }
 });
 
-// POST /api/v1/pm — create PM schedule
-router.post('/', authorize('admin','manager'), [
-  body('equipment_id').isString().notEmpty(),
-  body('name').trim().isLength({ min:2, max:150 }),
-  body('frequency_type').isIn(['daily','weekly','monthly','quarterly','yearly','hours']),
-  body('frequency_value').isInt({ min:1 }),
-  body('estimated_hours').optional().isFloat({ min:0 }),
-], async (req, res) => {
+// POST /api/v1/pm
+router.post('/', [
+  body('equipment_id').isUUID(),
+  body('name').isString().notEmpty(),
+  body('frequency_days').isInt({ min:1 }),
+  body('estimated_hours').optional().isFloat({ min:0.5 }),
+], async (req,res) => {
   const errs = validationResult(req);
   if (!errs.isEmpty()) return res.status(400).json({ success:false, errors:errs.array() });
   try {
-    const { equipment_id, name, description, frequency_type, frequency_value, estimated_hours, tasks, next_due_date } = req.body;
+    const { equipment_id, name, description, frequency_days, estimated_hours, checklist, next_due_date } = req.body;
+    const dueDate = next_due_date || new Date(Date.now() + frequency_days * 86400000).toISOString();
     const { rows } = await pool.query(
-      `INSERT INTO pm_schedules(equipment_id,name,description,frequency_type,frequency_value,estimated_hours,tasks,next_due_date)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [equipment_id, name, description||null, frequency_type, frequency_value,
-       estimated_hours||null, JSON.stringify(tasks||[]),
-       next_due_date||null]
+      `INSERT INTO pm_schedules(equipment_id,name,description,frequency_days,estimated_hours,checklist,next_due_date,is_active)
+       VALUES($1,$2,$3,$4,$5,$6,$7,TRUE) RETURNING *`,
+      [equipment_id, name, description||null, frequency_days, estimated_hours||null, JSON.stringify(checklist||[]), dueDate]
     );
     res.status(201).json({ success:true, data:rows[0] });
   } catch(e) { res.status(500).json({ success:false, error:e.message }); }
 });
 
 // PATCH /api/v1/pm/:id
-router.patch('/:id', authorize('admin','manager'), async (req, res) => {
+router.patch('/:id', async (req,res) => {
   try {
-    const allowed = ['name','description','frequency_type','frequency_value','estimated_hours','tasks','next_due_date','is_active'];
+    const allowed = ['name','description','frequency_days','estimated_hours','checklist','next_due_date','is_active'];
     const sets = [], vals = [];
     for (const k of allowed) {
       if (req.body[k] !== undefined) {
-        vals.push(k === 'tasks' ? JSON.stringify(req.body[k]) : req.body[k]);
+        vals.push(k === 'checklist' ? JSON.stringify(req.body[k]) : req.body[k]);
         sets.push(`${k}=$${vals.length}`);
       }
     }
     if (!sets.length) return res.status(400).json({ success:false, error:'No fields to update' });
     vals.push(req.params.id);
     const { rows } = await pool.query(
-      `UPDATE pm_schedules SET ${sets.join(',')} WHERE id=$${vals.length} RETURNING *`, vals
+      `UPDATE pm_schedules SET ${sets.join(',')},updated_at=NOW() WHERE id=$${vals.length} RETURNING *`, vals
     );
-    if (!rows[0]) return res.status(404).json({ success:false, error:'Not found' });
+    if (!rows[0]) return res.status(404).json({ success:false, error:'PM schedule not found' });
     res.json({ success:true, data:rows[0] });
   } catch(e) { res.status(500).json({ success:false, error:e.message }); }
 });
 
-// POST /api/v1/pm/:id/complete — mark done + auto-schedule next + create WO
-router.post('/:id/complete', authorize('admin','manager','technician'), [
-  body('completed_date').optional().isDate(),
+// POST /api/v1/pm/:id/complete — ทำ PM เสร็จ
+router.post('/:id/complete', [
+  body('actual_hours').isFloat({ min:0.1 }),
   body('notes').optional().isString(),
-  body('actual_hours').optional().isFloat({ min:0 }),
-], async (req, res) => {
+], async (req,res) => {
+  const errs = validationResult(req);
+  if (!errs.isEmpty()) return res.status(400).json({ success:false, errors:errs.array() });
   try {
-    const { rows: [pm] } = await pool.query('SELECT * FROM pm_schedules WHERE id=$1', [req.params.id]);
-    if (!pm) return res.status(404).json({ success:false, error:'PM schedule not found' });
+    const { actual_hours, notes, completed_by } = req.body;
+    const { rows: pm } = await pool.query('SELECT * FROM pm_schedules WHERE id=$1', [req.params.id]);
+    if (!pm[0]) return res.status(404).json({ success:false, error:'PM schedule not found' });
 
-    const completedDate = req.body.completed_date || new Date().toISOString().slice(0,10);
-    // Calculate next due date
-    const next = new Date(completedDate);
-    const fv = pm.frequency_value;
-    const ft = pm.frequency_type;
-    if (ft==='daily') next.setDate(next.getDate()+fv);
-    else if (ft==='weekly') next.setDate(next.getDate()+fv*7);
-    else if (ft==='monthly') next.setMonth(next.getMonth()+fv);
-    else if (ft==='quarterly') next.setMonth(next.getMonth()+fv*3);
-    else if (ft==='yearly') next.setFullYear(next.getFullYear()+fv);
-    else next.setDate(next.getDate()+30);
-
-    const nextDue = next.toISOString().slice(0,10);
-    await pool.query(
-      `UPDATE pm_schedules SET last_done_date=$1,next_due_date=$2 WHERE id=$3`,
-      [completedDate, nextDue, pm.id]
+    const nextDue = new Date(Date.now() + pm[0].frequency_days * 86400000).toISOString();
+    const { rows: updated } = await pool.query(
+      `UPDATE pm_schedules SET last_completed_at=NOW(), next_due_date=$1, last_completed_by=$2, updated_at=NOW() WHERE id=$3 RETURNING *`,
+      [nextDue, completed_by || req.user.id, req.params.id]
     );
 
-    // Create completion WO
+    // สร้าง Work Order บันทึกการทำ PM
     const { rows: wo } = await pool.query(
-      `SELECT wo_number FROM work_orders ORDER BY created_at DESC LIMIT 1`
-    );
-    const lastNum = wo[0]?.wo_number ? parseInt(wo[0].wo_number.split('-').pop()) : 0;
-    const woNum = `WO-${new Date().getFullYear()}-${String(lastNum+1).padStart(6,'0')}`;
-    await pool.query(
-      `INSERT INTO work_orders(wo_number,equipment_id,type,status,priority,title,description,created_by,actual_hours,completed_at,is_auto_generated)
-       VALUES($1,$2,'preventive','completed','low',$3,$4,$5,$6,NOW(),TRUE)`,
-      [woNum, pm.equipment_id, `PM Completed: ${pm.name}`,
-       req.body.notes||`PM schedule completed. Next due: ${nextDue}`,
-       req.user.id, req.body.actual_hours||pm.estimated_hours]
+      `INSERT INTO work_orders(equipment_id,type,priority,title,description,status,actual_hours,completed_at,assigned_to)
+       VALUES($1,'preventive','low',$2,$3,'completed',$4,NOW(),$5)
+       RETURNING wo_number`,
+      [pm[0].equipment_id, `PM: ${pm[0].name}`, notes||`Preventive maintenance completed. Next due: ${nextDue.slice(0,10)}`, actual_hours, req.user.id]
     );
 
-    res.json({ success:true, data:{ pm_id:pm.id, completed_date:completedDate, next_due_date:nextDue, wo_number:woNum } });
+    res.json({ success:true, data:{ ...updated[0], work_order: wo[0]?.wo_number, next_due_date:nextDue } });
   } catch(e) { res.status(500).json({ success:false, error:e.message }); }
 });
 
 // DELETE /api/v1/pm/:id (soft delete)
-router.delete('/:id', authorize('admin','manager'), async (req, res) => {
+router.delete('/:id', async (req,res) => {
   try {
-    const { rows } = await pool.query('UPDATE pm_schedules SET is_active=FALSE WHERE id=$1 RETURNING id', [req.params.id]);
-    if (!rows[0]) return res.status(404).json({ success:false, error:'Not found' });
+    const { rowCount } = await pool.query('UPDATE pm_schedules SET is_active=FALSE WHERE id=$1', [req.params.id]);
+    if (!rowCount) return res.status(404).json({ success:false, error:'PM schedule not found' });
     res.json({ success:true, message:'PM schedule deactivated' });
   } catch(e) { res.status(500).json({ success:false, error:e.message }); }
 });
