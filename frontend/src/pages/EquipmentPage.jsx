@@ -1,32 +1,20 @@
 import React,{useState,useEffect,useCallback}from'react';
 import{Link}from'react-router-dom';
 import{equipmentAPI}from'../utils/api';
-import api from'../utils/api';
 
 const hc=s=>s>=80?'var(--success)':s>=60?'var(--warning)':'var(--danger)';
-const S={input:{width:'100%',background:'var(--bg-base)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 10px',color:'var(--text-primary)',fontSize:13,boxSizing:'border-box'},label:{fontSize:12,color:'var(--text-muted)',display:'block',marginBottom:4,fontWeight:600,textTransform:'uppercase',letterSpacing:.4}};
+const SI={width:'100%',background:'var(--bg-base)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 10px',color:'var(--text-primary)',fontSize:13,boxSizing:'border-box'};
+const SL={fontSize:12,color:'var(--text-muted)',display:'block',marginBottom:4,fontWeight:600,textTransform:'uppercase',letterSpacing:.4};
 
-function Modal({title,onClose,children,width=520}){
-  return<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:16}}>
-    <div style={{background:'var(--bg-surface)',border:'1px solid var(--border)',borderRadius:12,width,maxWidth:'100%',maxHeight:'90vh',overflow:'auto'}}>
+function Modal({title,onClose,children}){
+  return<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:16}}>
+    <div style={{background:'var(--bg-surface)',border:'1px solid var(--border)',borderRadius:12,width:560,maxWidth:'100%',maxHeight:'90vh',overflowY:'auto'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
         <span style={{fontSize:15,fontWeight:700}}>{title}</span>
-        <button onClick={onClose}style={{background:'none',border:'none',color:'var(--text-muted)',fontSize:20,cursor:'pointer'}}>✕</button>
+        <button onClick={onClose}style={{background:'none',border:'none',color:'var(--text-muted)',fontSize:22,cursor:'pointer',lineHeight:1}}>✕</button>
       </div>
       <div style={{padding:20}}>{children}</div>
     </div>
-  </div>;
-}
-
-function Field({label,value,onChange,type='text',options,required,placeholder}){
-  return<div style={{marginBottom:14}}>
-    <label style={S.label}>{label}{required&&<span style={{color:'var(--danger)'}}>*</span>}</label>
-    {options
-      ?<select value={value}onChange={e=>onChange(e.target.value)}style={S.input}>
-        {options.map(o=><option key={o.value||o}value={o.value||o}>{o.label||o}</option>)}
-      </select>
-      :<input type={type}value={value||''}onChange={e=>onChange(e.target.value)}placeholder={placeholder}style={S.input}/>
-    }
   </div>;
 }
 
@@ -36,9 +24,9 @@ export default function EquipmentPage(){
   const[search,setSearch]=useState('');
   const[crit,setCrit]=useState('');
   const[showModal,setShowModal]=useState(false);
-  const[form,setForm]=useState({asset_code:'',name:'',type:'cnc',criticality:'medium',manufacturer:'',model:'',location_code:'CNC-BAY-1',cost_per_minute:0});
   const[saving,setSaving]=useState(false);
   const[error,setError]=useState('');
+  const[form,setForm]=useState({asset_code:'',name:'',type:'cnc',criticality:'medium',manufacturer:'',model:'',serial_number:'',cost_per_minute:''});
 
   const load=useCallback(async()=>{
     setLoading(true);
@@ -48,20 +36,33 @@ export default function EquipmentPage(){
 
   useEffect(()=>{const t=setTimeout(load,300);return()=>clearTimeout(t);},[load]);
 
-  const f=v=>setForm(p=>({...p,...v}));
+  const F=(k,v)=>setForm(p=>({...p,[k]:v}));
+
+  const openModal=()=>{
+    setForm({asset_code:'',name:'',type:'cnc',criticality:'medium',manufacturer:'',model:'',serial_number:'',cost_per_minute:''});
+    setError('');
+    setShowModal(true);
+  };
 
   const submit=async()=>{
-    if(!form.asset_code||!form.name){setError('รหัสอุปกรณ์และชื่อจำเป็น');return;}
+    if(!form.asset_code.trim()||!form.name.trim()){setError('กรุณากรอกรหัสอุปกรณ์และชื่อ');return;}
     setSaving(true);setError('');
     try{
-      // Get location_id from first location
-      const locs=await api.get('/equipment').then(r=>r.data?.data);
-      // Use default location from existing equipment
-      const locId=locs?.[0]?.location_id;
-      if(!locId)throw new Error('ไม่พบข้อมูลสถานที่ในระบบ');
-      await api.post('/equipment',{...form,location_id:locId,cost_per_minute:parseFloat(form.cost_per_minute)||0});
+      // ดึง location_id จากอุปกรณ์ที่มีอยู่แล้ว หรือส่ง null ถ้าไม่มี
+      const existing=equipment[0];
+      const payload={
+        asset_code:form.asset_code.trim(),
+        name:form.name.trim(),
+        type:form.type,
+        criticality:form.criticality,
+        manufacturer:form.manufacturer.trim()||undefined,
+        model:form.model.trim()||undefined,
+        serial_number:form.serial_number.trim()||undefined,
+        cost_per_minute:parseFloat(form.cost_per_minute)||0,
+        location_id:existing?.location_id||null,
+      };
+      await equipmentAPI.create(payload);
       setShowModal(false);
-      setForm({asset_code:'',name:'',type:'cnc',criticality:'medium',manufacturer:'',model:'',cost_per_minute:0});
       load();
     }catch(e){setError(e.response?.data?.error||e.message);}
     finally{setSaving(false);}
@@ -72,7 +73,7 @@ export default function EquipmentPage(){
   return(<div className="page">
     <div className="page-header flex justify-between items-center">
       <div><h1 className="page-title">Equipment</h1><p className="page-sub">{stats.total} assets · {stats.critical} critical · {stats.alerts} health alerts</p></div>
-      <button className="btn btn-primary"onClick={()=>{setShowModal(true);setError('');}}>+ Add Equipment</button>
+      <button className="btn btn-primary"onClick={openModal}>+ Add Equipment</button>
     </div>
 
     <div className="grid-4 mb-6">
@@ -122,21 +123,59 @@ export default function EquipmentPage(){
       ))}
     </div>}
 
-    {showModal&&<Modal title="เพิ่มอุปกรณ์ใหม่"onClose={()=>setShowModal(false)}>
-      <div className="grid-2">
-        <Field label="รหัสอุปกรณ์"value={form.asset_code}onChange={v=>f({asset_code:v})}placeholder="CNC-003"required/>
-        <Field label="ชื่ออุปกรณ์"value={form.name}onChange={v=>f({name:v})}placeholder="CNC Machining Center #3"required/>
-        <Field label="ประเภท"value={form.type}onChange={v=>f({type:v})}options={[{value:'cnc',label:'CNC Machine'},{value:'pump',label:'Pump'},{value:'compressor',label:'Compressor'},{value:'conveyor',label:'Conveyor'},{value:'hvac',label:'HVAC'},{value:'electrical',label:'Electrical'}]}/>
-        <Field label="ระดับความสำคัญ"value={form.criticality}onChange={v=>f({criticality:v})}options={[{value:'critical',label:'Critical'},{value:'high',label:'High'},{value:'medium',label:'Medium'},{value:'low',label:'Low'}]}/>
-        <Field label="ผู้ผลิต"value={form.manufacturer}onChange={v=>f({manufacturer:v})}placeholder="Mazak, Fanuc, etc."/>
-        <Field label="รุ่น"value={form.model}onChange={v=>f({model:v})}placeholder="VARIAXIS i-700"/>
-        <Field label="ต้นทุนต่อนาที (฿)"type="number"value={form.cost_per_minute}onChange={v=>f({cost_per_minute:v})}placeholder="850"/>
-        <Field label="Serial Number"value={form.serial_number}onChange={v=>f({serial_number:v})}placeholder="SN-2024-001"/>
+    {showModal&&<Modal title="➕ เพิ่มอุปกรณ์ใหม่"onClose={()=>setShowModal(false)}>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+        <div style={{gridColumn:'1/-1'}}>
+          <label style={SL}>รหัสอุปกรณ์ <span style={{color:'var(--danger)'}}>*</span></label>
+          <input style={SI}value={form.asset_code}onChange={e=>F('asset_code',e.target.value)}placeholder="เช่น CNC-003, PUMP-003"/>
+        </div>
+        <div style={{gridColumn:'1/-1'}}>
+          <label style={SL}>ชื่ออุปกรณ์ <span style={{color:'var(--danger)'}}>*</span></label>
+          <input style={SI}value={form.name}onChange={e=>F('name',e.target.value)}placeholder="เช่น CNC Machining Center #3"/>
+        </div>
+        <div>
+          <label style={SL}>ประเภท</label>
+          <select style={SI}value={form.type}onChange={e=>F('type',e.target.value)}>
+            <option value="cnc">CNC Machine</option>
+            <option value="pump">Pump</option>
+            <option value="compressor">Compressor</option>
+            <option value="conveyor">Conveyor</option>
+            <option value="hvac">HVAC</option>
+            <option value="electrical">Electrical</option>
+            <option value="robot">Robot</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label style={SL}>ระดับความสำคัญ</label>
+          <select style={SI}value={form.criticality}onChange={e=>F('criticality',e.target.value)}>
+            <option value="critical">🔴 Critical</option>
+            <option value="high">🟠 High</option>
+            <option value="medium">🟡 Medium</option>
+            <option value="low">🟢 Low</option>
+          </select>
+        </div>
+        <div>
+          <label style={SL}>ผู้ผลิต</label>
+          <input style={SI}value={form.manufacturer}onChange={e=>F('manufacturer',e.target.value)}placeholder="เช่น Mazak, Fanuc, SMC"/>
+        </div>
+        <div>
+          <label style={SL}>รุ่น</label>
+          <input style={SI}value={form.model}onChange={e=>F('model',e.target.value)}placeholder="เช่น VARIAXIS i-700"/>
+        </div>
+        <div>
+          <label style={SL}>Serial Number</label>
+          <input style={SI}value={form.serial_number}onChange={e=>F('serial_number',e.target.value)}placeholder="เช่น SN-2024-001"/>
+        </div>
+        <div>
+          <label style={SL}>ต้นทุนต่อนาที (฿)</label>
+          <input type="number"style={SI}value={form.cost_per_minute}onChange={e=>F('cost_per_minute',e.target.value)}placeholder="850"min="0"/>
+        </div>
       </div>
-      {error&&<div style={{color:'var(--danger)',fontSize:13,marginBottom:12}}>⚠ {error}</div>}
-      <div className="flex gap-2 justify-between">
+      {error&&<div style={{color:'var(--danger)',fontSize:13,marginTop:12,padding:'8px 12px',background:'rgba(239,68,68,.1)',borderRadius:6}}>⚠ {error}</div>}
+      <div className="flex gap-2 justify-between"style={{marginTop:16}}>
         <button onClick={()=>setShowModal(false)}className="btn btn-secondary">ยกเลิก</button>
-        <button onClick={submit}disabled={saving}className="btn btn-primary">{saving?'กำลังบันทึก...':'เพิ่มอุปกรณ์'}</button>
+        <button onClick={submit}disabled={saving}className="btn btn-primary">{saving?'⏳ กำลังบันทึก...':'✓ เพิ่มอุปกรณ์'}</button>
       </div>
     </Modal>}
   </div>);
