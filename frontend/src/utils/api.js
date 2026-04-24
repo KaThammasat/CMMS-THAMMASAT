@@ -81,6 +81,15 @@ export const alertsAPI = {
 // Inventory API
 export const inventoryAPI = {
   list: (params) => api.get('/inventory', { params }),
+  get: (id) => api.get('/inventory/'+id),
+  create: (data) => api.post('/inventory', data),
+  update: (id, data) => api.patch('/inventory/'+id, data),
+  delete: (id) => api.delete('/inventory/'+id),
+  receive: (id, data) => api.post('/inventory/'+id+'/receive', data),
+  adjust: (data) => api.post('/inventory/adjust', data),
+};
+const _oldInventoryAPI = {
+  list: (params) => api.get('/inventory', { params }),
   create: (data) => api.post('/inventory', data),
   adjust: (data) => api.post('/inventory/adjust', data),
   receive: (id, data) => api.post(`/inventory/${id}/receive`, data),

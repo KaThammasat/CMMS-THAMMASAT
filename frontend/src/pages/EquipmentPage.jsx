@@ -1,172 +1,170 @@
 import React,{useState,useEffect,useCallback}from'react';
 import{Link}from'react-router-dom';
-import{equipmentAPI}from'../utils/api';
+import api from'../utils/api';
 
-const hc=s=>s>=80?'var(--success)':s>=60?'var(--warning)':'var(--danger)';
+const SI={width:'100%',background:'var(--bg-base)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 10px',color:'var(--text-primary)',fontSize:13,boxSizing:'border-box'};
+const SL={fontSize:12,color:'var(--text-muted)',display:'block',marginBottom:4,fontWeight:600,textTransform:'uppercase',letterSpacing:.4};
+const Sk=()=><div className="skeleton"style={{height:16}}/>;
 
-const S={
-  overlay:{position:'fixed',inset:0,background:'rgba(0,0,0,.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:16},
-  modal:{background:'var(--bg-surface)',border:'1px solid var(--border)',borderRadius:12,width:560,maxWidth:'100%',maxHeight:'90vh',overflow:'auto'},
-  header:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 20px',borderBottom:'1px solid var(--border)'},
-  body:{padding:20},
-  label:{fontSize:12,fontWeight:700,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:.4,display:'block',marginBottom:4},
-  input:{width:'100%',background:'var(--bg-base)',border:'1px solid var(--border)',borderRadius:6,padding:'9px 12px',color:'var(--text-primary)',fontSize:13,boxSizing:'border-box'},
-  row:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14},
-  field:{marginBottom:14},
-};
+function Modal({title,onClose,children,width=580}){
+  return<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:16}}>
+    <div style={{background:'var(--bg-surface)',border:'1px solid var(--border)',borderRadius:12,width,maxWidth:'100%',maxHeight:'92vh',overflowY:'auto'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 18px',borderBottom:'1px solid var(--border)'}}>
+        <span style={{fontSize:15,fontWeight:700}}>{title}</span>
+        <button onClick={onClose}style={{background:'none',border:'none',color:'var(--text-muted)',fontSize:22,cursor:'pointer',lineHeight:1}}>✕</button>
+      </div>
+      <div style={{padding:18}}>{children}</div>
+    </div>
+  </div>;
+}
 
-function AddModal({onClose,onSave,equipment}){
-  const[form,setForm]=useState({asset_code:'',name:'',type:'cnc',criticality:'medium',manufacturer:'',model:'',serial_number:'',cost_per_minute:'850'});
+const TYPES=['cnc','pump','compressor','conveyor','motor','hydraulic','pneumatic','other'];
+const CRITS=['critical','high','medium','low'];
+
+function EqForm({init={},onSave,onCancel,saving,error}){
+  const[code,setCode]=useState(init.asset_code||'');
+  const[name,setName]=useState(init.name||'');
+  const[type,setType]=useState(init.type||'cnc');
+  const[crit,setCrit]=useState(init.criticality||'medium');
+  const[mfr,setMfr]=useState(init.manufacturer||'');
+  const[model,setModel]=useState(init.model||'');
+  const[serial,setSerial]=useState(init.serial_number||'');
+  const[cpm,setCpm]=useState(init.cost_per_minute||'');
+  const[hs,setHs]=useState(init.health_score||100);
+  const[installDate,setInstallDate]=useState(init.install_date?init.install_date.slice(0,10):'');
+  const isEdit=!!init.id;
+  return(<>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+      <div><label style={SL}>รหัสอุปกรณ์ *</label><input style={SI}value={code}onChange={e=>setCode(e.target.value)}placeholder="CNC-003"disabled={isEdit}/></div>
+      <div><label style={SL}>ชื่ออุปกรณ์ *</label><input style={SI}value={name}onChange={e=>setName(e.target.value)}placeholder="CNC Machining Center #3"/></div>
+      <div><label style={SL}>ประเภท *</label>
+        <select style={SI}value={type}onChange={e=>setType(e.target.value)}>
+          {TYPES.map(t=><option key={t}value={t}>{t.toUpperCase()}</option>)}
+        </select>
+      </div>
+      <div><label style={SL}>ระดับความสำคัญ *</label>
+        <select style={SI}value={crit}onChange={e=>setCrit(e.target.value)}>
+          {CRITS.map(c=><option key={c}value={c}>{c.charAt(0).toUpperCase()+c.slice(1)}</option>)}
+        </select>
+      </div>
+      <div><label style={SL}>ผู้ผลิต</label><input style={SI}value={mfr}onChange={e=>setMfr(e.target.value)}placeholder="Mazak, Grundfos..."/></div>
+      <div><label style={SL}>รุ่น</label><input style={SI}value={model}onChange={e=>setModel(e.target.value)}placeholder="VARIAXIS i-700"/></div>
+      <div><label style={SL}>Serial Number</label><input style={SI}value={serial}onChange={e=>setSerial(e.target.value)}/></div>
+      <div><label style={SL}>ต้นทุน/นาที (฿)</label><input type="number"style={SI}value={cpm}onChange={e=>setCpm(e.target.value)}min="0"/></div>
+      <div><label style={SL}>Health Score (%)</label><input type="number"style={SI}value={hs}onChange={e=>setHs(e.target.value)}min="0"max="100"/></div>
+      <div><label style={SL}>วันที่ติดตั้ง</label><input type="date"style={SI}value={installDate}onChange={e=>setInstallDate(e.target.value)}/></div>
+    </div>
+    {error&&<div style={{color:'var(--danger)',fontSize:13,marginBottom:10,padding:'8px 12px',background:'rgba(239,68,68,.08)',borderRadius:6}}>⚠ {error}</div>}
+    <div className="flex gap-2 justify-between">
+      <button onClick={onCancel}className="btn btn-secondary">ยกเลิก</button>
+      <button onClick={()=>onSave({asset_code:code,name,type,criticality:crit,manufacturer:mfr||undefined,model:model||undefined,serial_number:serial||undefined,cost_per_minute:parseFloat(cpm)||0,health_score:parseInt(hs)||100,install_date:installDate||undefined})}disabled={saving}className="btn btn-primary">{saving?'⏳ กำลังบันทึก...':'✓ บันทึก'}</button>
+    </div>
+  </>);
+}
+
+const critColor={critical:'var(--danger)',high:'var(--orange)',medium:'var(--warning)',low:'var(--success)'};
+const hBar=(s)=>{const c=s>=80?'var(--success)':s>=60?'var(--warning)':'var(--danger)';return<div style={{height:4,background:'var(--bg-elevated)',borderRadius:2,marginTop:4}}><div style={{height:'100%',width:`${s}%`,background:c,borderRadius:2}}/></div>;};
+
+export default function EquipmentPage(){
+  const[equip,setEquip]=useState([]);
+  const[loading,setLoading]=useState(true);
+  const[search,setSearch]=useState('');
+  const[critFilter,setCritFilter]=useState('');
+  const[modal,setModal]=useState(null);
+  const[selected,setSelected]=useState(null);
   const[saving,setSaving]=useState(false);
   const[error,setError]=useState('');
-  const f=(k,v)=>setForm(p=>({...p,[k]:v}));
 
-  const submit=async(e)=>{
-    e.preventDefault();
-    if(!form.asset_code.trim()||!form.name.trim()){setError('กรุณากรอกรหัสและชื่ออุปกรณ์');return;}
+  const load=useCallback(async()=>{
+    setLoading(true);
+    try{const r=await api.get('/equipment',{params:{search:search||undefined,criticality:critFilter||undefined,limit:50}});setEquip(r.data?.data||[]);}
+    catch(e){console.error(e);}finally{setLoading(false);}
+  },[search,critFilter]);
+
+  useEffect(()=>{const t=setTimeout(load,300);return()=>clearTimeout(t);},[load]);
+
+  const openAdd=()=>{setSelected(null);setError('');setModal('add');};
+  const openEdit=(e)=>{setSelected(e);setError('');setModal('edit');};
+
+  const handleSave=async(data)=>{
+    if(!data.asset_code?.trim()||!data.name?.trim()){setError('รหัสและชื่ออุปกรณ์จำเป็น');return;}
     setSaving(true);setError('');
     try{
-      const locId=equipment?.[0]?.location_id;
-      if(!locId){setError('ไม่พบข้อมูลสถานที่ กรุณาลองใหม่');setSaving(false);return;}
-      await equipmentAPI.create({...form,location_id:locId,cost_per_minute:parseFloat(form.cost_per_minute)||0});
-      onSave();
+      if(modal==='add') await api.post('/equipment',data);
+      else await api.patch('/equipment/'+selected.id,data);
+      setModal(null);load();
     }catch(e){setError(e.response?.data?.error||e.message);}
     finally{setSaving(false);}
   };
 
-  return(
-    <div style={S.overlay} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={S.modal}>
-        <div style={S.header}>
-          <span style={{fontSize:15,fontWeight:700}}>⚙ เพิ่มอุปกรณ์ใหม่</span>
-          <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text-muted)',fontSize:20,cursor:'pointer',lineHeight:1}}>✕</button>
-        </div>
-        <form onSubmit={submit} style={S.body}>
-          <div style={S.row}>
-            <div style={S.field}>
-              <label style={S.label}>รหัสอุปกรณ์ *</label>
-              <input style={S.input} placeholder="CNC-003" value={form.asset_code} onChange={e=>f('asset_code',e.target.value)} autoFocus/>
-            </div>
-            <div style={S.field}>
-              <label style={S.label}>ชื่ออุปกรณ์ *</label>
-              <input style={S.input} placeholder="CNC Machining Center #3" value={form.name} onChange={e=>f('name',e.target.value)}/>
-            </div>
-          </div>
-          <div style={S.row}>
-            <div style={S.field}>
-              <label style={S.label}>ประเภท</label>
-              <select style={S.input} value={form.type} onChange={e=>f('type',e.target.value)}>
-                {[['cnc','CNC Machine'],['pump','Pump'],['compressor','Compressor'],['conveyor','Conveyor'],['hvac','HVAC'],['electrical','Electrical']].map(([v,l])=><option key={v} value={v}>{l}</option>)}
-              </select>
-            </div>
-            <div style={S.field}>
-              <label style={S.label}>ระดับความสำคัญ</label>
-              <select style={S.input} value={form.criticality} onChange={e=>f('criticality',e.target.value)}>
-                {['critical','high','medium','low'].map(v=><option key={v} value={v}>{v.charAt(0).toUpperCase()+v.slice(1)}</option>)}
-              </select>
-            </div>
-          </div>
-          <div style={S.row}>
-            <div style={S.field}>
-              <label style={S.label}>ผู้ผลิต</label>
-              <input style={S.input} placeholder="Mazak, Fanuc, etc." value={form.manufacturer} onChange={e=>f('manufacturer',e.target.value)}/>
-            </div>
-            <div style={S.field}>
-              <label style={S.label}>รุ่น</label>
-              <input style={S.input} placeholder="VARIAXIS i-700" value={form.model} onChange={e=>f('model',e.target.value)}/>
-            </div>
-          </div>
-          <div style={S.row}>
-            <div style={S.field}>
-              <label style={S.label}>Serial Number</label>
-              <input style={S.input} placeholder="SN-2024-001" value={form.serial_number} onChange={e=>f('serial_number',e.target.value)}/>
-            </div>
-            <div style={S.field}>
-              <label style={S.label}>ต้นทุนต่อนาที (฿)</label>
-              <input style={S.input} type="number" min="0" placeholder="850" value={form.cost_per_minute} onChange={e=>f('cost_per_minute',e.target.value)}/>
-            </div>
-          </div>
-          {error&&<div style={{color:'var(--danger)',fontSize:13,marginBottom:12,padding:'8px 12px',background:'rgba(239,68,68,.1)',borderRadius:6}}>⚠ {error}</div>}
-          <div style={{display:'flex',justifyContent:'space-between',gap:8}}>
-            <button type="button" onClick={onClose} className="btn btn-secondary">ยกเลิก</button>
-            <button type="submit" disabled={saving} className="btn btn-primary">{saving?'กำลังบันทึก...':'✓ เพิ่มอุปกรณ์'}</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+  const handleDelete=async(e)=>{
+    if(!window.confirm(`ลบ "${e.name}" (${e.asset_code})?\n\nจะไม่สามารถยกเลิกได้ และต้องไม่มีใบสั่งงานที่ active อยู่`))return;
+    try{await api.delete('/equipment/'+e.id);load();}
+    catch(err){alert(err.response?.data?.error||err.message);}
+  };
 
-export default function EquipmentPage(){
-  const[equipment,setEquipment]=useState([]);
-  const[loading,setLoading]=useState(true);
-  const[search,setSearch]=useState('');
-  const[crit,setCrit]=useState('');
-  const[showModal,setShowModal]=useState(false);
-
-  const load=useCallback(async()=>{
-    setLoading(true);
-    try{const r=await equipmentAPI.list({search:search||undefined,criticality:crit||undefined});setEquipment(r.data?.data||[]);}
-    catch(e){console.error(e);}finally{setLoading(false);}
-  },[search,crit]);
-
-  useEffect(()=>{const t=setTimeout(load,300);return()=>clearTimeout(t);},[load]);
-
-  const stats={total:equipment.length,critical:equipment.filter(e=>e.criticality==='critical').length,alerts:equipment.filter(e=>e.health_score<70).length,downtime:equipment.filter(e=>e.active_downtime>0).length};
+  const total=equip.length, critical=equip.filter(e=>e.criticality==='critical').length;
+  const alerts=equip.filter(e=>(e.health_score||100)<70).length;
+  const downtime=equip.filter(e=>+e.active_downtime_count>0).length;
 
   return(<div className="page">
     <div className="page-header flex justify-between items-center">
-      <div><h1 className="page-title">Equipment</h1><p className="page-sub">{stats.total} assets · {stats.critical} critical · {stats.alerts} health alerts</p></div>
-      <button className="btn btn-primary" onClick={()=>setShowModal(true)}>+ Add Equipment</button>
+      <div><h1 className="page-title">⚙ อุปกรณ์</h1><p className="page-sub">{total} เครื่อง · {critical} วิกฤต · {alerts} แจ้งเตือน</p></div>
+      <button className="btn btn-primary"onClick={openAdd}>+ เพิ่มอุปกรณ์</button>
     </div>
 
-    <div className="grid-4 mb-6">
-      {[{l:'Total Assets',v:stats.total},{l:'Critical Assets',v:stats.critical,c:'var(--danger)'},{l:'Health Alerts',v:stats.alerts,c:stats.alerts>0?'var(--warning)':'var(--success)'},{l:'Active Downtime',v:stats.downtime,c:stats.downtime>0?'var(--danger)':'var(--success)'}].map(({l,v,c})=>(
-        <div key={l} className="card"><div className="stat-label">{l}</div><div className="stat-value" style={{color:c||'var(--text-primary)'}}>{v}</div></div>
+    <div className="grid-4 mb-4">
+      {[{l:'ทั้งหมด',v:total},{l:'วิกฤต',v:critical,c:'var(--danger)'},{l:'แจ้งเตือน Health',v:alerts,c:'var(--warning)'},{l:'หยุดเดินเครื่อง',v:downtime,c:downtime>0?'var(--danger)':'var(--success)'}].map(({l,v,c})=>(
+        <div key={l}className="card"><div className="stat-label">{l}</div><div className="stat-value"style={{fontSize:24,color:c||'var(--text-primary)'}}>{v}</div></div>
       ))}
     </div>
 
-    <div className="flex gap-2 mb-4" style={{flexWrap:'wrap'}}>
-      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search equipment..."
-        style={{flex:1,minWidth:200,background:'var(--bg-surface)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',color:'var(--text-primary)',fontSize:13}}/>
-      {['','critical','high','medium','low'].map(v=>(
-        <button key={v} onClick={()=>setCrit(v)} className={`btn btn-${crit===v?'primary':'secondary'}`} style={{fontSize:12,padding:'6px 12px'}}>{v||'All Criticality'}</button>
+    <div className="flex gap-2 mb-4"style={{flexWrap:'wrap'}}>
+      <input value={search}onChange={e=>setSearch(e.target.value)}placeholder="ค้นหาอุปกรณ์..."style={{flex:1,minWidth:180,...SI,height:34,padding:'4px 10px'}}/>
+      {['','critical','high','medium','low'].map(c=>(
+        <button key={c}onClick={()=>setCritFilter(c)}className={`btn btn-${critFilter===c?'primary':'secondary'}`}style={{fontSize:12,padding:'4px 12px'}}>
+          {c||'ทั้งหมด'}
+        </button>
       ))}
     </div>
 
-    {loading?<div className="grid-2">{[...Array(4)].map((_,i)=><div key={i} className="card"><div className="skeleton" style={{height:120}}/></div>)}</div>:
-    equipment.length===0?<div className="card" style={{textAlign:'center',padding:40}}><p className="text-muted">No equipment found</p></div>:
-    <div className="grid-2">
-      {equipment.map(eq=>(
-        <Link key={eq.id} to={`/equipment/${eq.id}`} style={{textDecoration:'none'}}>
-          <div className="card" style={{cursor:'pointer',border:`1px solid ${eq.criticality==='critical'?'rgba(239,68,68,.3)':'var(--border)'}`,transition:'all .15s'}}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--accent)';e.currentTarget.style.transform='translateY(-1px)'}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor=eq.criticality==='critical'?'rgba(239,68,68,.3)':'var(--border)';e.currentTarget.style.transform=''}}>
-            <div className="flex justify-between items-center" style={{marginBottom:12}}>
-              <div className="flex items-center gap-2">
-                <span style={{fontSize:18}}>{eq.type==='pump'?'💧':'⚙'}</span>
-                <div><div style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>{eq.name}</div><div style={{fontSize:11,color:'var(--text-muted)',fontFamily:'var(--mono)'}}>{eq.asset_code}</div></div>
-              </div>
-              <span className={`badge badge-${eq.criticality}`}>{eq.criticality}</span>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:16}}>
+      {loading?[...Array(4)].map((_,i)=><div key={i}className="card"><Sk/></div>):
+      equip.length===0?<div className="card"style={{gridColumn:'1/-1',textAlign:'center',padding:40,color:'var(--text-muted)'}}>ไม่พบอุปกรณ์</div>:
+      equip.map(e=>(
+        <div key={e.id}className="card"style={{border:`1px solid ${critColor[e.criticality]||'var(--border)'}22`,position:'relative'}}>
+          <div className="flex justify-between items-start"style={{marginBottom:10}}>
+            <div>
+              <Link to={`/equipment/${e.id}`}style={{fontWeight:700,color:'var(--text-primary)',fontSize:15,textDecoration:'none'}}>{e.name}</Link>
+              <div style={{fontSize:11,color:'var(--text-muted)',fontFamily:'var(--mono)',marginTop:2}}>{e.asset_code}</div>
             </div>
-            <div className="flex justify-between items-center" style={{marginBottom:6}}>
-              <span style={{fontSize:12,color:'var(--text-muted)'}}>Health Score</span>
-              <span style={{fontSize:14,fontWeight:700,color:hc(eq.health_score)}}>{eq.health_score}%</span>
-            </div>
-            <div className="health-bar" style={{marginBottom:12}}><div className="health-bar-fill" style={{width:`${eq.health_score}%`,background:hc(eq.health_score)}}/></div>
-            <div className="flex justify-between">
-              <div style={{fontSize:11,color:'var(--text-muted)'}}>{eq.location_name||eq.location_code}</div>
-              <div className="flex gap-2">
-                {eq.open_wo_count>0&&<span style={{fontSize:11,color:'var(--accent)'}}>📋 {eq.open_wo_count} WO</span>}
-                {eq.active_downtime>0&&<span style={{fontSize:11,color:'var(--danger)'}}>● Down</span>}
-                {eq.risk_score&&<span style={{fontSize:11,color:'var(--warning)'}}>Risk: {Math.round(eq.risk_score)}</span>}
-              </div>
-            </div>
+            <span className={`badge badge-${e.criticality}`}style={{fontSize:10}}>{e.criticality?.toUpperCase()}</span>
           </div>
-        </Link>
+          <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:8}}>
+            {e.manufacturer&&<span>{e.manufacturer} {e.model}</span>}
+          </div>
+          <div style={{fontSize:12,marginBottom:2,display:'flex',justifyContent:'space-between'}}>
+            <span style={{color:'var(--text-muted)'}}>Health Score</span>
+            <span style={{fontWeight:700,color:(e.health_score||100)>=80?'var(--success)':(e.health_score||100)>=60?'var(--warning)':'var(--danger)'}}>{e.health_score||100}%</span>
+          </div>
+          {hBar(e.health_score||100)}
+          <div className="flex gap-2"style={{marginTop:12}}>
+            <span style={{fontSize:11,color:'var(--text-muted)'}}>📋 {e.active_wo_count||0} WO</span>
+            {+e.active_downtime_count>0&&<span style={{fontSize:11,color:'var(--danger)'}}>● หยุด</span>}
+            {e.risk_score&&<span style={{fontSize:11,color:'var(--warning)'}}>⚠ Risk:{e.risk_score}%</span>}
+          </div>
+          <div className="flex gap-1"style={{marginTop:10}}>
+            <Link to={`/equipment/${e.id}`}className="btn btn-secondary"style={{padding:'4px 8px',fontSize:11,flex:1,textAlign:'center'}}>ดูรายละเอียด</Link>
+            <button onClick={()=>openEdit(e)}className="btn btn-secondary"style={{padding:'4px 8px',fontSize:11}}>✏</button>
+            <button onClick={()=>handleDelete(e)}className="btn btn-danger"style={{padding:'4px 8px',fontSize:11}}>🗑</button>
+          </div>
+        </div>
       ))}
-    </div>}
+    </div>
 
-    {showModal&&<AddModal equipment={equipment} onClose={()=>setShowModal(false)} onSave={()=>{setShowModal(false);load();}}/>}
+    {modal==='add'&&<Modal title="⚙ เพิ่มอุปกรณ์ใหม่"onClose={()=>setModal(null)}>
+      <EqForm onSave={handleSave}onCancel={()=>setModal(null)}saving={saving}error={error}/></Modal>}
+    {modal==='edit'&&selected&&<Modal title={`✏ แก้ไข — ${selected.name}`}onClose={()=>setModal(null)}>
+      <EqForm init={selected}onSave={handleSave}onCancel={()=>setModal(null)}saving={saving}error={error}/></Modal>}
   </div>);
 }

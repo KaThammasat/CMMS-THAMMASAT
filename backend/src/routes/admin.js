@@ -258,3 +258,50 @@ router.patch('/repair-requests/:id', async (req,res) => {
     res.json({success:true,data:rows[0]});
   }catch(e){res.status(500).json({success:false,error:e.message});}
 });
+
+// ── COMPANY SETTINGS ────────────────────────────────────────────
+// GET /api/v1/admin/company
+router.get('/company', async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT key,value FROM system_config WHERE key LIKE 'company_%' OR key IN ('system_name','system_timezone','maintenance_mode','alert_email_enabled') ORDER BY key`);
+    const data = {};
+    rows.forEach(r => { try { data[r.key]=JSON.parse(r.value); } catch { data[r.key]=r.value; } });
+    res.json({ success:true, data });
+  } catch(e) { res.status(500).json({ success:false, error:e.message }); }
+});
+
+// PATCH /api/v1/admin/company
+router.patch('/company', async (req, res) => {
+  try {
+    const allowed = ['company_name','company_name_th','company_logo_url','company_address','company_phone','company_email','company_website','company_tax_id','system_name','system_timezone'];
+    for (const key of allowed) {
+      if (req.body[key]!==undefined) {
+        await pool.query(`INSERT INTO system_config(key,value,updated_by) VALUES($1,$2,$3) ON CONFLICT(key) DO UPDATE SET value=$2,updated_by=$3,updated_at=NOW()`,
+          [key, typeof req.body[key]==='string'?req.body[key]:JSON.stringify(req.body[key]), req.user.id]);
+      }
+    }
+    await pool.query(`INSERT INTO audit_log(actor_id,action,entity_type,after_data,ip_address) VALUES($1,'UPDATE_COMPANY_SETTINGS','system_config',$2,$3)`,
+      [req.user.id, JSON.stringify(req.body), req.ip]);
+    res.json({ success:true, message:'Company settings updated' });
+  } catch(e) { res.status(500).json({ success:false, error:e.message }); }
+});
+
+// GET /api/v1/admin/repair-requests/stats — top failing equipment + repair stats
+router.get('/dashboard-stats', async (req, res) => {
+  try {
+    const [topFailing, recentRepairs, pendingRepairs] = await Promise.all([
+      pool.query(`SELECT e.id,e.asset_code,e.name,e.type,e.criticality,e.health_score,
+                         COUNT(wo.id) as total_failures,
+                         SUM(CASE WHEN dr.end_time IS NULL THEN 1 ELSE 0 END) as active_downtime
+                  FROM equipment e
+                  LEFT JOIN work_orders wo ON wo.equipment_id=e.id AND wo.type='corrective'
+                  LEFT JOIN downtime_records dr ON dr.equipment_id=e.id
+                  GROUP BY e.id ORDER BY total_failures DESC, e.health_score ASC LIMIT 5`),
+      pool.query(`SELECT r.*,u.first_name||' '||u.last_name as assigned_name
+                  FROM repair_requests r LEFT JOIN users u ON u.id=r.assigned_to
+                  ORDER BY r.created_at DESC LIMIT 10`),
+      pool.query(`SELECT COUNT(*) FROM repair_requests WHERE status='pending'`),
+    ]);
+    res.json({ success:true, data:{ top_failing_equipment:topFailing.rows, recent_repairs:recentRepairs.rows, pending_repair_count:+pendingRepairs.rows[0].count } });
+  } catch(e) { res.status(500).json({ success:false, error:e.message }); }
+});

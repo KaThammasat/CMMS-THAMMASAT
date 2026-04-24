@@ -207,7 +207,15 @@ async function seedRichData() {
       ('pm_advance_days','7','Days in advance to generate PM work orders'),
       ('cost_per_downtime_hour','5000','Default cost per hour of downtime in THB'),
       ('alert_email_enabled','false','Send alert emails'),
-      ('maintenance_mode','false','Put system in maintenance mode')
+      ('maintenance_mode','false','Put system in maintenance mode'),
+      ('company_name','Thammasat Industrial','Company name (English)'),
+      ('company_name_th','บริษัท ธรรมศาสตร์ อินดัสเทรียล','Company name (Thai)'),
+      ('company_logo_url','','URL of company logo image'),
+      ('company_address','','Company address'),
+      ('company_phone','','Company phone'),
+      ('company_email','','Company email'),
+      ('system_name','CMMS Thammasat Industrial','System display name'),
+      ('system_timezone','Asia/Bangkok','System timezone')
     `);
     logger.info('✅ System config seeded');
   }

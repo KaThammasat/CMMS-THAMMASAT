@@ -388,6 +388,78 @@ function SecurityTab(){
 }
 
 
+
+// ── Company Settings Tab ─────────────────────────────────────────
+function CompanyTab(){
+  const[cfg,setCfg]=useState({});
+  const[loading,setLoading]=useState(true);
+  const[saving,setSaving]=useState(false);
+  const[saved,setSaved]=useState(false);
+  const[fields,setFields]=useState({});
+
+  useEffect(()=>{
+    api.get('/admin/company').then(r=>{setCfg(r.data?.data||{});setFields({});}).catch(console.error).finally(()=>setLoading(false));
+  },[]);
+
+  const get=(k)=>fields[k]!==undefined?fields[k]:(cfg[k]||'');
+  const set=(k,v)=>setFields(p=>({...p,[k]:v}));
+
+  const save=async()=>{
+    setSaving(true);setSaved(false);
+    try{await api.patch('/admin/company',fields);setCfg(p=>{const n={...p};Object.entries(fields).forEach(([k,v])=>{n[k]=v;});return n;});setFields({});setSaved(true);setTimeout(()=>setSaved(false),3000);}
+    catch(e){alert(e.response?.data?.error||e.message);}finally{setSaving(false);}
+  };
+
+  const SECTIONS=[
+    {title:'🏢 ข้อมูลบริษัท',fields:[
+      {key:'company_name',label:'ชื่อบริษัท (English)',placeholder:'Thammasat Industrial Co., Ltd.'},
+      {key:'company_name_th',label:'ชื่อบริษัท (ภาษาไทย)',placeholder:'บริษัท ธรรมศาสตร์ อินดัสเทรียล จำกัด'},
+      {key:'company_tax_id',label:'เลขประจำตัวผู้เสียภาษี',placeholder:'0-1234-56789-01-2'},
+      {key:'company_address',label:'ที่อยู่',placeholder:'123 ถนนพหลโยธิน กรุงเทพฯ 10330'},
+      {key:'company_phone',label:'โทรศัพท์',placeholder:'+66-2-XXXX-XXXX'},
+      {key:'company_email',label:'อีเมล',placeholder:'maintenance@company.com'},
+      {key:'company_website',label:'เว็บไซต์',placeholder:'https://www.company.com'},
+    ]},
+    {title:'🖥 ตั้งค่าระบบ',fields:[
+      {key:'system_name',label:'ชื่อระบบ (แสดงใน Header)',placeholder:'CMMS Thammasat Industrial'},
+      {key:'company_logo_url',label:'URL โลโก้บริษัท',placeholder:'https://example.com/logo.png'},
+      {key:'system_timezone',label:'Timezone',placeholder:'Asia/Bangkok'},
+    ]},
+  ];
+
+  return(<div>
+    <div className="flex justify-between items-center mb-6">
+      <div><h3 style={{fontSize:16,fontWeight:700}}>ข้อมูลบริษัทและการตั้งค่าระบบ</h3><p style={{fontSize:12,color:'var(--text-muted)',marginTop:2}}>ข้อมูลจะแสดงในระบบและเอกสารต่างๆ</p></div>
+      <div className="flex gap-2 items-center">
+        {Object.keys(fields).length>0&&<span style={{fontSize:12,color:'var(--warning)'}}>⚠ {Object.keys(fields).length} ที่ยังไม่บันทึก</span>}
+        {saved&&<span style={{fontSize:12,color:'var(--success)'}}>✓ บันทึกแล้ว</span>}
+        <button onClick={save}disabled={saving||Object.keys(fields).length===0}className="btn btn-primary">{saving?'กำลังบันทึก...':'💾 บันทึกทั้งหมด'}</button>
+      </div>
+    </div>
+    {loading?<div className="grid-2">{[...Array(2)].map((_,i)=><div key={i}className="card"><div className="skeleton"style={{height:200}}/></div>)}</div>:
+    <div className="grid-2">
+      {SECTIONS.map(sec=>(
+        <div key={sec.title}className="card">
+          <div className="section-title"style={{marginBottom:16}}>{sec.title}</div>
+          {sec.fields.map(f=>(
+            <div key={f.key}style={{marginBottom:14}}>
+              <label style={{fontSize:12,color:'var(--text-muted)',display:'block',marginBottom:4,fontWeight:600}}>{f.label}</label>
+              {f.key==='company_address'?
+                <textarea value={get(f.key)}onChange={e=>set(f.key,e.target.value)}placeholder={f.placeholder}style={{width:'100%',background:'var(--bg-base)',border:`1px solid ${fields[f.key]!==undefined?'var(--warning)':'var(--border)'}`,borderRadius:6,padding:'8px 10px',color:'var(--text-primary)',fontSize:13,minHeight:60,resize:'vertical',fontFamily:'inherit',boxSizing:'border-box'}}/>:
+                <input value={get(f.key)}onChange={e=>set(f.key,e.target.value)}placeholder={f.placeholder}style={{width:'100%',background:'var(--bg-base)',border:`1px solid ${fields[f.key]!==undefined?'var(--warning)':'var(--border)'}`,borderRadius:6,padding:'8px 10px',color:'var(--text-primary)',fontSize:13,boxSizing:'border-box'}}/>
+              }
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>}
+    {get('company_logo_url')&&<div className="card"style={{marginTop:16}}>
+      <div className="section-title"style={{marginBottom:12}}>Preview โลโก้</div>
+      <img src={get('company_logo_url')}alt="Company Logo"style={{maxHeight:80,maxWidth:300,objectFit:'contain',borderRadius:6,background:'var(--bg-base)',padding:8}}onError={e=>e.target.style.display='none'}/>
+    </div>}
+  </div>);
+}
+
 // ── Repair Requests Tab ──────────────────────────────────────────
 function RepairTab(){
   const[requests,setRequests]=useState([]);
@@ -495,6 +567,7 @@ const TABS=[
   {id:'security',label:'🛡 Security & Stats',component:SecurityTab},
   {id:'audit',label:'📋 Audit Log',component:AuditTab},
   {id:'repair',label:'🔧 Repair Requests',component:RepairTab},
+  {id:'company',label:'🏢 ข้อมูลบริษัท',component:CompanyTab},
 ];
 
 export default function AdminPage(){
