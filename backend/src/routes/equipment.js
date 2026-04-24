@@ -21,7 +21,7 @@ router.get('/', async (req, res) => {
       `SELECT e.*,l.name as location_name,l.id as location_id,
               (SELECT COUNT(*) FROM work_orders WHERE equipment_id=e.id AND status NOT IN ('completed','closed','cancelled')) as active_wo_count,
               (SELECT COUNT(*) FROM downtime_records WHERE equipment_id=e.id AND end_time IS NULL) as active_downtime_count,
-              (SELECT risk_score FROM ai_predictions WHERE equipment_id=e.id ORDER BY ai_predictions.created_at DESC LIMIT 1) as risk_score
+              (SELECT risk_score FROM ai_predictions WHERE equipment_id=e.id ORDER BY ai_predictions.predicted_at DESC LIMIT 1) as risk_score
        FROM equipment e LEFT JOIN locations l ON l.id=e.location_id
        ${where} ORDER BY CASE e.criticality WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, e.asset_code ASC LIMIT $${i} OFFSET $${i+1}`,
       [...params,parseInt(limit),offset]
@@ -38,7 +38,7 @@ router.get('/:id', async (req, res) => {
       query(`SELECT e.*,l.name as location_name,l.id as location_id FROM equipment e LEFT JOIN locations l ON l.id=e.location_id WHERE e.id=$1`,[req.params.id]),
       query(`SELECT wo.*,u.first_name||' '||u.last_name as assigned_to_name FROM work_orders wo LEFT JOIN users u ON u.id=wo.assigned_to WHERE wo.equipment_id=$1 ORDER BY wo.created_at DESC LIMIT 10`,[req.params.id]),
       query(`SELECT * FROM downtime_records WHERE equipment_id=$1 ORDER BY start_time DESC LIMIT 5`,[req.params.id]),
-      query(`SELECT * FROM ai_predictions WHERE equipment_id=$1 ORDER BY created_at DESC LIMIT 5`,[req.params.id]),
+      query(`SELECT * FROM ai_predictions WHERE equipment_id=$1 ORDER BY predicted_at DESC LIMIT 5`,[req.params.id]),
     ]);
     if (!eqR.rows[0]) return res.status(404).json({ success:false, error:'Equipment not found' });
     res.json({ success:true, data:{ ...eqR.rows[0], recent_work_orders:woR.rows, downtime_history:dtR.rows, predictions:predR.rows } });
