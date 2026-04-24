@@ -21,7 +21,7 @@ router.get('/', async (req, res) => {
       `SELECT e.*,l.name as location_name,l.id as location_id,
               (SELECT COUNT(*) FROM work_orders WHERE equipment_id=e.id AND status NOT IN ('completed','closed','cancelled')) as active_wo_count,
               (SELECT COUNT(*) FROM downtime_records WHERE equipment_id=e.id AND end_time IS NULL) as active_downtime_count,
-              (SELECT risk_score FROM ai_predictions WHERE equipment_id=e.id ORDER BY created_at DESC LIMIT 1) as risk_score
+              (SELECT risk_score FROM ai_predictions ap WHERE ap.equipment_id=e.id ORDER BY ap.created_at DESC LIMIT 1) as risk_score
        FROM equipment e LEFT JOIN locations l ON l.id=e.location_id
        ${where} ORDER BY CASE e.criticality WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, e.asset_code ASC LIMIT $${i} OFFSET $${i+1}`,
       [...params,parseInt(limit),offset]
